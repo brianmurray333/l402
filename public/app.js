@@ -75,6 +75,26 @@ var toHost = function (value) {
   catch (e) { return value; }
 };
 
+var showToast = function (message) {
+  var existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  var toast = document.createElement("div");
+  toast.className = "toast";
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(function () { toast.classList.add("toast--visible"); });
+  setTimeout(function () {
+    toast.classList.remove("toast--visible");
+    setTimeout(function () { toast.remove(); }, 300);
+  }, 2000);
+};
+
+var copyEndpointToClipboard = function (text) {
+  navigator.clipboard.writeText(text).then(function () {
+    showToast("Copied to clipboard");
+  });
+};
+
 /* -- App Confirmation Modal -- */
 var openModal = function () {
   confirmModal.classList.add("is-open");
@@ -368,13 +388,22 @@ var createApiCard = function (api) {
   var endpointPath = document.createElement("span");
   endpointPath.className = "api-endpoint-path";
   endpointPath.textContent = api.endpoint || "";
-  endpointRow.append(method, endpointPath);
+  endpointPath.title = "Click to copy";
+  endpointPath.style.cursor = "pointer";
+  endpointPath.addEventListener("click", function (e) {
+    e.stopPropagation();
+    copyEndpointToClipboard(api.endpoint || "");
+  });
+  var copyBtn = document.createElement("button");
+  copyBtn.className = "api-copy-btn";
+  copyBtn.title = "Copy URL";
+  copyBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  copyBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    copyEndpointToClipboard(api.endpoint || "");
+  });
+  endpointRow.append(method, endpointPath, copyBtn);
   card.appendChild(endpointRow);
-
-  var desc = document.createElement("p");
-  desc.className = "api-card-desc";
-  desc.textContent = api.description || api.name || "";
-  card.appendChild(desc);
 
   if (api.boost) {
     var boostBadge = document.createElement("div");
@@ -383,18 +412,13 @@ var createApiCard = function (api) {
     card.appendChild(boostBadge);
   }
 
-  var footer = document.createElement("div");
-  footer.className = "api-card-footer";
+  var descRow = document.createElement("div");
+  descRow.className = "api-card-desc-row";
 
-  if (api.docsUrl) {
-    var docsLink = document.createElement("a");
-    docsLink.href = api.docsUrl;
-    docsLink.target = "_blank";
-    docsLink.rel = "noreferrer";
-    docsLink.className = "api-docs-link";
-    docsLink.innerHTML = 'Docs <span class="api-arrow">\u2192</span>';
-    footer.appendChild(docsLink);
-  }
+  var desc = document.createElement("p");
+  desc.className = "api-card-desc";
+  desc.textContent = api.description || api.name || "";
+  descRow.appendChild(desc);
 
   var boostBtn = document.createElement("button");
   boostBtn.className = "boost-btn";
@@ -404,9 +428,9 @@ var createApiCard = function (api) {
     e.stopPropagation();
     startBoostFlow(api.id, "api", (api.provider || api.name) + " - " + api.name);
   });
-  footer.appendChild(boostBtn);
+  descRow.appendChild(boostBtn);
 
-  card.appendChild(footer);
+  card.appendChild(descRow);
   return card;
 };
 
