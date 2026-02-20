@@ -919,16 +919,18 @@ textarea:focus {
 }
 
 .app-detail-actions .button,
-.app-detail-actions button {
+.app-detail-actions button,
+.app-detail-actions a {
   white-space: nowrap;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  box-sizing: border-box;
 }
 
 .app-detail-visit {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 20px;
-  font-size: 0.88rem;
   text-decoration: none;
 }
 
@@ -1489,18 +1491,18 @@ textarea:focus {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    border: none;
-    background: var(--accent);
-    color: #fff;
+    border: 1.5px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
   }
 
   .nav-submit:hover {
-    background: var(--accent);
-    border-color: transparent;
+    background: rgba(57, 240, 209, 0.12);
+    border-color: var(--accent);
   }
 
   .nav-submit .nav-submit-plus {
-    color: #fff;
+    color: var(--accent);
     font-size: 1.2rem;
     font-weight: 700;
     line-height: 1;
