@@ -1378,10 +1378,11 @@ textarea:focus {
 
   .hero {
     grid-template-columns: 1fr;
-    padding: 20px;
+    padding: 0;
     border: none;
     box-shadow: none;
     background: none;
+    border-radius: 0;
   }
 
   h1 {
