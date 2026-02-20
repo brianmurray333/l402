@@ -1397,7 +1397,7 @@ textarea:focus {
 
   .tile-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 14px;
   }
 
   .explained-grid {
@@ -1496,7 +1496,7 @@ textarea:focus {
 
   .tile-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 12px;
   }
 
   .tile-name {
