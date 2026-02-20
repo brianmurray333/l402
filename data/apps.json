@@ -14,13 +14,6 @@
     "icon": "/images/stakwork.png"
   },
   {
-    "name": "moneydevkit",
-    "url": "https://moneydevkit.com",
-    "description": "Global payments at the speed of light. Add bitcoin payments to any app in minutes with a few lines of code.",
-    "image": "/images/moneydevkit.png",
-    "icon": "/images/moneydevkit.png"
-  },
-  {
     "name": "Ganamos",
     "url": "https://ganamos.earth",
     "description": "Fix your community, earn bitcoin.",
@@ -35,11 +28,32 @@
     "icon": "/images/speedread.png"
   },
   {
+    "name": "Voltage",
+    "url": "https://voltage.cloud",
+    "description": "Global money infrastructure built on Bitcoin. Instant payments, USD settlement, and Lightning-powered APIs for financial platforms at scale.",
+    "image": "/images/voltage.png",
+    "icon": "/images/voltage.png"
+  },
+  {
     "name": "Alby",
     "url": "https://getalby.com",
     "description": "Bitcoin Lightning wallet with built-in L402 support. Browser extension and hub for Lightning payments.",
     "image": "/images/alby.png",
     "icon": "/images/alby.png"
+  },
+  {
+    "name": "Amboss",
+    "url": "https://www.amboss.tech",
+    "description": "Enterprise-grade Bitcoin Lightning Network infrastructure. Trading, payments, liquidity provision, and real-time network analytics.",
+    "image": "/images/amboss.jpeg",
+    "icon": "/images/amboss.jpeg"
+  },
+  {
+    "name": "moneydevkit",
+    "url": "https://moneydevkit.com",
+    "description": "Global payments at the speed of light. Add bitcoin payments to any app in minutes with a few lines of code.",
+    "image": "/images/moneydevkit.png",
+    "icon": "/images/moneydevkit.png"
   },
   {
     "name": "Fewsats",
@@ -68,19 +82,5 @@
     "description": "L402 service directory and marketplace. Discover Lightning-paywalled APIs for your AI agents.",
     "image": "/images/satring.jpeg",
     "icon": "/images/satring.jpeg"
-  },
-  {
-    "name": "Amboss",
-    "url": "https://www.amboss.tech",
-    "description": "Enterprise-grade Bitcoin Lightning Network infrastructure. Trading, payments, liquidity provision, and real-time network analytics.",
-    "image": "/images/amboss.jpeg",
-    "icon": "/images/amboss.jpeg"
-  },
-  {
-    "name": "Voltage",
-    "url": "https://voltage.cloud",
-    "description": "Global money infrastructure built on Bitcoin. Instant payments, USD settlement, and Lightning-powered APIs for financial platforms at scale.",
-    "image": "/images/voltage.png",
-    "icon": "/images/voltage.png"
   }
 ]
