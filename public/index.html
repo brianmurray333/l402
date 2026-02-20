@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L402 Apps</title>
+    <meta name="description" content="Apps and services that can be accessed via L402 payment gateways. No personal info sharing required." />
+    <meta property="og:title" content="L402 Apps" />
+    <meta property="og:description" content="Apps and services that can be accessed via L402 payment gateways. No personal info sharing required." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.l402apps.com" />
+    <meta property="og:image" content="https://www.l402apps.com/images/bitcoin.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="L402 Apps" />
+    <meta name="twitter:description" content="Apps and services that can be accessed via L402 payment gateways. No personal info sharing required." />
+    <meta name="twitter:image" content="https://www.l402apps.com/images/bitcoin.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/images/bitcoin.png" />
+    <link rel="apple-touch-icon" href="/images/bitcoin.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="site-header">
+      <div class="brand">
+        <span class="brand-mark">L402 Apps</span>
+      </div>
+      <nav class="site-nav">
+        <a href="/explained.html" class="nav-link-why"><img src="/images/bitcoin.png" alt="" class="nav-icon" />L402?</a>
+        <a href="#apps">Apps</a>
+        <a href="#apis">APIs</a>
+        <a href="#submit" class="nav-submit"><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <h1>Discover apps that unlock instantly with L402.</h1>
+          <p class="lede">
+            Apps and services that can be accessed via L402 payment gateways. No personal info sharing required.
+          </p>
+        </div>
+      </section>
+
+      <section id="apps" class="apps-section">
+        <div class="tile-grid" data-tile-grid></div>
+      </section>
+
+      <section id="apis" class="apis-section">
+        <div class="section-header">
+          <h2>L402 APIs</h2>
+          <p>Lightning-paywalled endpoints your app or agent can call.</p>
+        </div>
+        <div class="api-grid" data-api-grid></div>
+      </section>
+
+      <section id="submit" class="submit-section">
+        <div class="section-header">
+          <h2>Submit</h2>
+          <p>Add an app or earn sats by submitting verified L402 API endpoints.</p>
+        </div>
+
+        <form class="submit-form" id="submission-form">
+          <div class="field full">
+            <label for="submit-url">App or API endpoint URL</label>
+            <input
+              id="submit-url"
+              name="submit-url"
+              type="text"
+              placeholder="example.com or api.example.com/v1/resource"
+              required
+            />
+          </div>
+          <button type="submit" class="primary" id="submit-btn">Submit</button>
+          <p class="form-note">
+            We auto-detect whether this is an app or L402 API endpoint.
+            <span id="paywall-note"></span>
+          </p>
+        </form>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span class="footer-badge">Made with <img src="/images/bitcoin.png" alt="Bitcoin" class="bitcoin-logo" /></span>
+    </footer>
+
+    <!-- ── App Detail Modal ── -->
+    <div class="modal" id="app-detail-modal" aria-hidden="true">
+      <div class="modal-content modal-content--sm" role="dialog" aria-modal="true" aria-labelledby="app-detail-title">
+        <div class="modal-header">
+          <div class="app-detail-title-row">
+            <img id="app-detail-icon" class="app-detail-icon" alt="" />
+            <h3 id="app-detail-title"></h3>
+          </div>
+          <button class="icon-button" type="button" data-app-detail-close aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body app-detail-body">
+          <p id="app-detail-description" class="app-detail-desc"></p>
+          <div class="app-detail-actions">
+            <a id="app-detail-link" class="primary app-detail-visit" target="_blank" rel="noreferrer">
+              Visit <span class="app-detail-visit-arrow">→</span>
+            </a>
+            <button id="app-detail-boost" class="boost-btn">⚡ Boost</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── App Confirmation Modal ── -->
+    <div class="modal" id="confirm-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="modal-header">
+          <h3 id="confirm-title">Confirm app details</h3>
+          <button class="icon-button" type="button" data-modal-close aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body" id="confirm-body">
+          <div class="modal-preview">
+            <div class="preview-tile">
+              <div class="preview-image" data-preview-image></div>
+              <span class="sr-only" data-preview-name>App name</span>
+            </div>
+          </div>
+          <form class="confirm-form" id="confirm-form">
+            <div class="field">
+              <label for="confirm-name">App name</label>
+              <input id="confirm-name" name="confirm-name" type="text" required />
+            </div>
+            <div class="field">
+              <label for="confirm-url">App URL</label>
+              <input id="confirm-url" name="confirm-url" type="url" required />
+            </div>
+            <div class="field full">
+              <label for="confirm-description">Description</label>
+              <textarea id="confirm-description" name="confirm-description" rows="4"></textarea>
+            </div>
+            <div class="field full">
+              <label for="confirm-image">Tile image URL</label>
+              <input id="confirm-image" name="confirm-image" type="url" />
+            </div>
+            <div class="field full">
+              <label for="confirm-icon">App icon URL</label>
+              <input id="confirm-icon" name="confirm-icon" type="url" />
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="ghost" data-modal-close>Cancel</button>
+              <button type="submit" class="primary" id="save-btn">Save and publish</button>
+            </div>
+            <p class="form-note" data-confirm-status></p>
+          </form>
+        </div>
+
+        <!-- L402 Payment Step (for app submission) -->
+        <div class="modal-payment" id="payment-step" style="display:none">
+          <div class="payment-inner">
+            <div class="payment-icon-wrap">⚡</div>
+            <h3 class="payment-heading">Pay <span id="payment-amount">100</span> sats to submit</h3>
+            <p class="payment-subtext">Scan the Lightning invoice below or copy it to your wallet.</p>
+            <img id="payment-qr" class="payment-qr" alt="Lightning invoice QR code" />
+            <div class="payment-invoice-row">
+              <input id="payment-invoice-text" type="text" readonly />
+              <button type="button" class="ghost payment-copy-btn" id="copy-invoice">Copy</button>
+            </div>
+            <p class="payment-status" id="payment-status">Waiting for payment…</p>
+            <button type="button" class="ghost payment-cancel" id="cancel-payment">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── API Confirmation Modal ── -->
+    <div class="modal" id="api-confirm-modal" aria-hidden="true">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="api-confirm-title">
+        <div class="modal-header">
+          <h3 id="api-confirm-title">✓ Verified L402 Endpoint</h3>
+          <button class="icon-button" type="button" data-api-modal-close aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body api-confirm-body">
+          <div class="api-verify-result">
+            <div class="api-verify-row">
+              <span class="api-verify-label">Provider</span>
+              <span class="api-verify-value" id="api-verify-provider"></span>
+            </div>
+            <div class="api-verify-row">
+              <span class="api-verify-label">Method</span>
+              <span class="api-verify-value" id="api-verify-method"></span>
+            </div>
+            <div class="api-verify-row">
+              <span class="api-verify-label">Endpoint</span>
+              <span class="api-verify-value api-verify-endpoint" id="api-verify-endpoint"></span>
+            </div>
+            <div class="api-verify-row">
+              <span class="api-verify-label">Cost</span>
+              <span class="api-verify-value" id="api-verify-cost"></span>
+            </div>
+            <div class="api-verify-row">
+              <span class="api-verify-label">Description</span>
+              <span class="api-verify-value" id="api-verify-description"></span>
+            </div>
+          </div>
+          <form id="api-confirm-form">
+            <div class="field full">
+              <label for="api-invoice">Your Lightning Invoice (10 sats)</label>
+              <input id="api-invoice" type="text" placeholder="lnbc100n1p..." required />
+              <p class="form-note">
+                Create a <strong>10 sat</strong> invoice in your Lightning wallet and paste it here to receive your reward.
+              </p>
+            </div>
+            <div class="field full">
+              <label for="api-edit-description">Description (optional override)</label>
+              <input id="api-edit-description" type="text" placeholder="What does this endpoint do?" />
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="ghost" data-api-modal-close>Cancel</button>
+              <button type="submit" class="primary" id="api-save-btn">Submit &amp; Earn 10 sats</button>
+            </div>
+            <p class="form-note" data-api-confirm-status></p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Boost Modal ── -->
+    <div class="modal" id="boost-modal" aria-hidden="true">
+      <div class="modal-content modal-content--sm" role="dialog" aria-modal="true" aria-labelledby="boost-title">
+        <div class="modal-header">
+          <h3 id="boost-title">⚡ Boost Listing</h3>
+          <button class="icon-button" type="button" data-boost-modal-close aria-label="Close">
+            ✕
+          </button>
+        </div>
+
+        <!-- Boost confirm body -->
+        <div class="boost-confirm" id="boost-confirm">
+          <p class="boost-item-name" id="boost-item-name"></p>
+          <p class="boost-price-info">
+            Current boost price: <strong><span id="boost-price">21</span> sats</strong>
+          </p>
+          <p class="boost-explain">Boosted items appear at the top of the list for 24 hours. Price increases as more items are boosted.</p>
+          <div class="modal-actions">
+            <button type="button" class="ghost" data-boost-modal-close>Cancel</button>
+            <button type="button" class="primary" id="boost-pay-btn">Pay &amp; Boost</button>
+          </div>
+        </div>
+
+        <!-- Boost payment step -->
+        <div class="modal-payment" id="boost-payment-step" style="display:none">
+          <div class="payment-inner">
+            <div class="payment-icon-wrap">⚡</div>
+            <h3 class="payment-heading">Pay <span id="boost-payment-amount">21</span> sats to boost</h3>
+            <p class="payment-subtext">Scan the Lightning invoice below or copy it to your wallet.</p>
+            <img id="boost-payment-qr" class="payment-qr" alt="Lightning invoice QR code" />
+            <div class="payment-invoice-row">
+              <input id="boost-payment-invoice-text" type="text" readonly />
+              <button type="button" class="ghost payment-copy-btn" id="boost-copy-invoice">Copy</button>
+            </div>
+            <p class="payment-status" id="boost-payment-status">Waiting for payment…</p>
+            <button type="button" class="ghost payment-cancel" data-boost-modal-close>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

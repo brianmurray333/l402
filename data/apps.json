@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Sphinx",
+    "url": "https://sphinx.chat",
+    "description": "Encrypted messaging over the Lightning Network. No central servers, no data collection. Send bitcoin instantly to anyone.",
+    "image": "/images/sphinx.png",
+    "icon": "/images/sphinx.png"
+  },
+  {
+    "name": "Stakwork",
+    "url": "https://community.sphinx.chat/bounties",
+    "description": "Digital task marketplace where humans and agents earn bitcoin bounties for completing tasks.",
+    "image": "/images/stakwork.png",
+    "icon": "/images/stakwork.png"
+  },
+  {
+    "name": "moneydevkit",
+    "url": "https://moneydevkit.com",
+    "description": "Global payments at the speed of light. Add bitcoin payments to any app in minutes with a few lines of code.",
+    "image": "/images/moneydevkit.png",
+    "icon": "/images/moneydevkit.png"
+  },
+  {
+    "name": "Ganamos",
+    "url": "https://ganamos.earth",
+    "description": "Fix your community, earn bitcoin.",
+    "image": "/images/ganamos.png",
+    "icon": "/images/ganamos.png"
+  },
+  {
+    "name": "Speedread",
+    "url": "https://speedread.fit",
+    "description": "A rapid reading studio that helps you absorb content faster with pacing controls, timers, and focus tools.",
+    "image": "/images/speedread.png",
+    "icon": "/images/speedread.png"
+  },
+  {
+    "name": "Alby",
+    "url": "https://getalby.com",
+    "description": "Bitcoin Lightning wallet with built-in L402 support. Browser extension and hub for Lightning payments.",
+    "image": "/images/alby.png",
+    "icon": "/images/alby.png"
+  },
+  {
+    "name": "Fewsats",
+    "url": "https://fewsats.com",
+    "description": "Payment infrastructure for AI agents. Enables autonomous agents to pay and get paid using L402.",
+    "image": "/images/fewsats.png",
+    "icon": "/images/fewsats.png"
+  },
+  {
+    "name": "OrdinalsBot",
+    "url": "https://ordinalsbot.com",
+    "description": "We make it easy to inscribe ordinals on Bitcoin with L402 checkout. Like, really easy.",
+    "image": "/images/ordinalsbot.png",
+    "icon": "/images/ordinalsbot.png"
+  },
+  {
+    "name": "Maximum Sats",
+    "url": "https://maximumsats.com",
+    "description": "Bitcoin tools and APIs powered by Lightning Network. AI, Web of Trust scoring, Nostr summaries. Pay per request via L402.",
+    "image": "https://maximumsats.com/favicon.svg",
+    "icon": "https://maximumsats.com/favicon.svg"
+  },
+  {
+    "name": "Satring",
+    "url": "https://satring.com",
+    "description": "L402 service directory and marketplace. Discover Lightning-paywalled APIs for your AI agents.",
+    "image": "/images/satring.jpeg",
+    "icon": "/images/satring.jpeg"
+  }
+]

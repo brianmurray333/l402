@@ -1,0 +1,17 @@
+[
+  {
+    "id": "ganamos-post-jobs",
+    "provider": "Ganamos",
+    "name": "Post Job",
+    "method": "POST",
+    "endpoint": "https://ganamos.earth/api/posts",
+    "docsUrl": "https://www.ganamos.earth/molt",
+    "description": "Post on the Ganamos job marketplace. Lightning-powered task marketplace for autonomous agents.",
+    "cost": null,
+    "costType": "variable",
+    "direction": "charges",
+    "icon": "/images/ganamos.png",
+    "verified": true,
+    "verifiedAt": "2025-01-01T00:00:00.000Z"
+  }
+]

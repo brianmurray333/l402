@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L402 Explained – L402 Apps</title>
+    <meta name="description" content="Learn how L402 works — the internet-native payment protocol built on Bitcoin's Lightning Network that lets you access apps instantly without sign-ups or personal data." />
+    <meta property="og:title" content="L402 Explained" />
+    <meta property="og:description" content="Learn how L402 works — the internet-native payment protocol built on Bitcoin's Lightning Network that lets you access apps instantly without sign-ups or personal data." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://www.l402apps.com/explained.html" />
+    <meta property="og:image" content="https://www.l402apps.com/images/bitcoin.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="L402 Explained" />
+    <meta name="twitter:description" content="Learn how L402 works — the internet-native payment protocol built on Bitcoin's Lightning Network that lets you access apps instantly without sign-ups or personal data." />
+    <meta name="twitter:image" content="https://www.l402apps.com/images/bitcoin.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" type="image/png" href="/images/bitcoin.png" />
+    <link rel="apple-touch-icon" href="/images/bitcoin.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="site-header">
+      <div class="brand">
+        <a href="/" class="brand-link"><span class="brand-mark">L402 Apps</span></a>
+      </div>
+      <nav class="site-nav">
+        <a href="/explained.html" class="nav-link-why nav-active"><img src="/images/bitcoin.png" alt="" class="nav-icon" />L402?</a>
+        <a href="/#apps">Apps</a>
+        <a href="/#apis">APIs</a>
+        <a href="/#submit" class="nav-submit"><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
+      </nav>
+    </header>
+
+    <main>
+      <article class="explained">
+        <header class="explained-hero">
+          <p class="explained-eyebrow">Protocol deep-dive</p>
+          <h1>L402 Explained</h1>
+          <p class="explained-subtitle">How a forgotten HTTP status code became the foundation for internet-native payments.</p>
+        </header>
+
+        <!-- Section 1: History of 402 -->
+        <section class="explained-section">
+          <h2>The 402 status code: reserved for future use</h2>
+          <p>
+            When the architects of HTTP defined the protocol's status codes in the early 1990s, they included <strong>402 Payment Required</strong>. The idea was simple: one day the web would need a native way to charge for content and services. But credit card infrastructure wasn't ready, micro-payments didn't exist yet, and the code sat dormant for decades — a placeholder waiting for the right technology to give it meaning.
+          </p>
+          <p>
+            While the rest of the web built paywalls with login forms, cookies, and subscription databases, 402 quietly waited. Every major browser shipped with support for the status code, yet no standard ever defined how to use it. Until Lightning arrived.
+          </p>
+        </section>
+
+        <!-- Section 2: Lightning Labs invents L402 -->
+        <section class="explained-section">
+          <h2>Lightning Labs brings 402 to life</h2>
+          <p>
+            In 2020, <strong>Lightning Labs</strong> introduced L402 (originally called LSAT — Lightning Service Authentication Tokens). The protocol finally gave HTTP 402 a concrete implementation by combining two primitives:
+          </p>
+          <ul class="explained-list">
+            <li><strong>Lightning invoices</strong> — instant, low-fee Bitcoin payments settled in milliseconds over the Lightning Network.</li>
+            <li><strong>Macaroons</strong> — flexible, attenuated bearer credentials that encode exactly what a user is allowed to access.</li>
+          </ul>
+          <p>
+            When a client requests a paid resource, the server responds with <code>402 Payment Required</code> and attaches a Lightning invoice plus a macaroon. The client pays the invoice, receives a preimage as proof, and binds it to the macaroon. That combined token is all you need — no account, no password, no personal data.
+          </p>
+        </section>
+
+        <!-- Section 3: Why L402 is unique -->
+        <section class="explained-section">
+          <h2>Why L402 is unique</h2>
+          <p>
+            Traditional online payments rely on fiat money rails — credit card networks, bank transfers, payment processors — each adding latency, fees, and intermediaries. L402 replaces all of that with a single round-trip:
+          </p>
+          <div class="explained-grid">
+            <div class="explained-card">
+              <h3>Access for payment</h3>
+              <p>Instead of subscribing, signing up, or handing over a credit card, you simply pay a Lightning invoice and instantly receive access. The payment <em>is</em> the authentication.</p>
+            </div>
+            <div class="explained-card">
+              <h3>Internet-native money</h3>
+              <p>Lightning payments are as native to the internet as HTTP itself. No bank APIs, no card networks, no currency conversion — just value moving at the speed of packets.</p>
+            </div>
+            <div class="explained-card">
+              <h3>Seamless integration</h3>
+              <p>Because L402 lives in HTTP headers, it works with any client — browsers, CLI tools, AI agents, IoT devices. If it speaks HTTP, it can pay for and access an L402-protected resource.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: What this means for authentication -->
+        <section class="explained-section">
+          <h2>The end of sign-in</h2>
+          <p>
+            Think about every app you use. Before you can do anything, you create an account: email, password, maybe phone verification, maybe a credit card on file. You hand over personal information just to prove you should have access.
+          </p>
+          <p>
+            L402 flips this model entirely. <strong>Payment replaces identity.</strong> When you pay a Lightning invoice, the cryptographic proof of payment is your credential. There's no user table, no password to breach, no personal data to leak. You pay, you're in.
+          </p>
+          <p>
+            This is especially powerful for AI agents and automated systems. An agent can discover a paid API, pay for it programmatically, and use the service — all without a human ever creating an account or entering credentials. It's authentication that scales to machines.
+          </p>
+        </section>
+
+        <!-- Section 5: L402 vs x402 -->
+        <section class="explained-section">
+          <h2>L402 vs. x402</h2>
+          <p>
+            Coinbase recently introduced <strong>x402</strong>, their own take on HTTP 402 payments. While the goal is similar — paying for resources over HTTP — the approaches differ significantly:
+          </p>
+          <div class="explained-comparison">
+            <div class="explained-card">
+              <h3>L402 <span class="tag-accent">Lightning Network</span></h3>
+              <ul>
+                <li>Settles in milliseconds over Lightning</li>
+                <li>Sub-cent micro-payments are economically viable</li>
+                <li>No blockchain congestion — payments happen off-chain</li>
+                <li>Battle-tested since 2020 with growing ecosystem</li>
+                <li>Macaroon-based credentials enable fine-grained access control</li>
+                <li>True privacy — no on-chain footprint, no wallet identity required</li>
+              </ul>
+            </div>
+            <div class="explained-card">
+              <h3>x402 <span class="tag-muted">Base / Stablecoins</span></h3>
+              <ul>
+                <li>Relies on on-chain or L2 stablecoin transfers</li>
+                <li>Higher minimum viable payment due to gas/fees</li>
+                <li>Tied to Coinbase ecosystem and EVM chains</li>
+                <li>Newer protocol, smaller ecosystem</li>
+                <li>Wallet address is a persistent identifier</li>
+                <li>Stablecoin dependency introduces counterparty risk</li>
+              </ul>
+            </div>
+          </div>
+          <p>
+            L402 was purpose-built for the web. It uses Bitcoin — the most neutral, permissionless money on the internet — and delivers it through Lightning, which was designed from the ground up for instant, high-frequency payments. x402 extends blockchain payment patterns to HTTP, but inherits the friction, fees, and identity leakage of on-chain transactions.
+          </p>
+        </section>
+
+        <!-- Section 6: Resources -->
+        <section class="explained-section">
+          <h2>Go deeper</h2>
+          <p>
+            Want to build with L402 or just understand the protocol better? These are the best starting points:
+          </p>
+          <div class="explained-resources">
+            <a href="https://l402.org" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">L402 Homepage</span>
+              <span class="resource-desc">Official guides and resources for the L402 protocol.</span>
+            </a>
+            <a href="https://github.com/lightninglabs/L402" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">L402 Protocol Spec</span>
+              <span class="resource-desc">The full technical specification on GitHub.</span>
+            </a>
+            <a href="https://colab.research.google.com/drive/1MLZy1g6-lFqbRAfFOxR14PZ3b36sYr1r" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">Interactive L402 Notebook</span>
+              <span class="resource-desc">Hands-on Python tutorial — from basics to setting up an L402 server and client.</span>
+            </a>
+            <a href="https://github.com/Fewsats/awesome-L402" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">Awesome L402</span>
+              <span class="resource-desc">A curated list of L402 libraries, projects, tools, and companies.</span>
+            </a>
+            <a href="https://research.google/pubs/macaroons-cookies-with-contextual-caveats-for-decentralized-authorization-in-the-cloud/" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">Macaroons Research Paper</span>
+              <span class="resource-desc">The original paper: "Cookies with Contextual Caveats for Decentralized Authorization in the Cloud."</span>
+            </a>
+            <a href="https://docs.lightning.engineering/the-lightning-network/l402" target="_blank" rel="noopener" class="resource-link">
+              <span class="resource-title">Lightning Labs Builder's Guide</span>
+              <span class="resource-desc">Official L402 documentation and quick-start for developers.</span>
+            </a>
+          </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="explained-cta">
+          <h2>See L402 in action</h2>
+          <p>Browse apps that accept L402 payments today, or submit your own.</p>
+          <div class="explained-cta-buttons">
+            <a href="/#apps" class="primary">View apps</a>
+            <a href="/#submit" class="ghost">Submit an app</a>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <span class="footer-badge">Made with <img src="/images/bitcoin.png" alt="Bitcoin" class="bitcoin-logo" /></span>
+    </footer>
+  </body>
+</html>
