@@ -993,11 +993,15 @@ textarea:focus {
   color: var(--text);
   font-weight: 500;
   font-size: 0.95rem;
-  transition: color 0.2s ease;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  transition: all 0.2s ease;
 }
 
 .nav-submit:hover {
   color: var(--accent);
+  border-color: var(--accent);
 }
 
 .nav-submit-icon {
