@@ -201,8 +201,13 @@ var closeAppDetailModal = function () {
 document.querySelectorAll("[data-app-detail-close]").forEach(function (btn) {
   btn.addEventListener("click", closeAppDetailModal);
 });
+var appDetailMouseDownTarget = null;
+appDetailModal.addEventListener("mousedown", function (e) {
+  appDetailMouseDownTarget = e.target;
+});
 appDetailModal.addEventListener("click", function (e) {
-  if (e.target === appDetailModal) closeAppDetailModal();
+  if (e.target === appDetailModal && appDetailMouseDownTarget === appDetailModal) closeAppDetailModal();
+  appDetailMouseDownTarget = null;
 });
 
 var supportsHover = window.matchMedia("(hover: hover)").matches;

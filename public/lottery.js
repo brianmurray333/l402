@@ -240,8 +240,13 @@
 
   buyBtn.addEventListener("click", openModal);
   modalClose.addEventListener("click", closeModal);
+  var modalMouseDownTarget = null;
+  modal.addEventListener("mousedown", function (e) {
+    modalMouseDownTarget = e.target;
+  });
   modal.addEventListener("click", function (e) {
-    if (e.target === modal) closeModal();
+    if (e.target === modal && modalMouseDownTarget === modal) closeModal();
+    modalMouseDownTarget = null;
   });
 
   amountInput.addEventListener("input", updateOdds);
