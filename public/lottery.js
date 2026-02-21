@@ -248,6 +248,9 @@
     if (e.target === modal && modalMouseDownTarget === modal) closeModal();
     modalMouseDownTarget = null;
   });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+  });
 
   amountInput.addEventListener("input", updateOdds);
 
