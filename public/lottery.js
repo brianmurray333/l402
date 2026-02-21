@@ -83,7 +83,10 @@
     potAmountEl.innerHTML =
       formatSats(lottery.totalPot) +
       ' <span class="pot-amount-unit">sats</span>';
-    entryCountEl.textContent = lottery.entryCount || 0;
+    var count = lottery.entryCount || 0;
+    entryCountEl.textContent = count;
+    var entryLabelEl = document.getElementById("entry-label");
+    if (entryLabelEl) entryLabelEl.textContent = count === 1 ? "entry" : "entries";
   }
 
   function renderEntries() {
