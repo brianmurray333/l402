@@ -240,6 +240,7 @@ h2 {
   padding: 14px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   justify-content: flex-start;
   background: linear-gradient(140deg, rgba(13, 18, 30, 0.96), rgba(7, 9, 14, 0.96));
   opacity: 0;
@@ -253,6 +254,7 @@ h2 {
   display: flex;
   gap: 8px;
   margin-top: auto;
+  flex-shrink: 0;
 }
 
 .hovercard-visit-btn {
@@ -318,7 +320,13 @@ h2 {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.4;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .launch {
