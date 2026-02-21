@@ -315,8 +315,8 @@
       }
     }
 
-    if (amount < 10) {
-      formStatus.textContent = "Minimum entry is 10 sats.";
+    if (amount < 100) {
+      formStatus.textContent = "Minimum entry is 100 sats.";
       formStatus.className = "ticket-status ticket-status--error";
       return;
     }

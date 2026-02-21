@@ -44,7 +44,7 @@ const BOOST_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LOTTERY_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const LOTTERY_HOUSE_CUT = 0; // 0% for now
 const LOTTERY_DEFAULT_SATS = 100;
-const LOTTERY_MIN_SATS = 10;
+const LOTTERY_MIN_SATS = 100;
 const LOTTERY_MAX_SATS = 1000000;
 const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 
