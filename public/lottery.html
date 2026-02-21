@@ -239,6 +239,24 @@
         transition: border-color 0.2s;
       }
       .ticket-field input:focus { border-color: var(--accent); }
+
+      .amount-input-wrap {
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .amount-input-wrap input {
+        padding-right: 50px;
+      }
+      .amount-suffix {
+        position: absolute;
+        right: 14px;
+        color: var(--muted);
+        font-size: 0.85rem;
+        pointer-events: none;
+        font-family: "Space Grotesk", sans-serif;
+      }
+
       .ticket-field .field-hint {
         font-size: 0.75rem;
         color: var(--muted);
@@ -466,6 +484,15 @@
           <h2><span class="ticket-bolt">⚡</span> Buy Lottery Ticket</h2>
 
           <div class="ticket-field">
+            <label>Amount</label>
+            <div class="amount-input-wrap">
+              <input type="number" id="ticket-amount" value="100" min="10" max="1000000" step="100" />
+              <span class="amount-suffix">sats</span>
+            </div>
+            <div class="ticket-odds" id="ticket-odds"></div>
+          </div>
+
+          <div class="ticket-field">
             <label>Payout Method</label>
             <div class="payout-toggle">
               <button type="button" class="payout-toggle-btn is-active" data-method="lightning_address">Lightning Address</button>
@@ -475,7 +502,7 @@
 
           <div class="ticket-field" id="field-ln-address">
             <label>Lightning Address</label>
-            <input type="text" id="ticket-ln-address" placeholder="you@getalby.com" autocomplete="email" />
+            <input type="text" id="ticket-ln-address" placeholder="lnbc1p5e... or you@getalby.com" autocomplete="email" />
             <div class="field-hint">Where we'll send your winnings if you win</div>
           </div>
 
@@ -485,12 +512,6 @@
             <div class="field-hint">Your LN node public key — winnings sent via keysend</div>
           </div>
 
-          <div class="ticket-field">
-            <label>Amount (sats)</label>
-            <input type="number" id="ticket-amount" value="100" min="10" max="1000000" />
-            <div class="field-hint">Min 10 sats · More sats = higher chance of winning</div>
-            <div class="ticket-odds" id="ticket-odds"></div>
-          </div>
           <button class="ticket-submit-btn" id="ticket-get-invoice">Get Invoice</button>
           <div class="ticket-status" id="ticket-form-status" style="margin-top:10px"></div>
         </div>
