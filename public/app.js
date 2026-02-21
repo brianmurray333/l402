@@ -617,8 +617,6 @@ cancelPaymentBtn.addEventListener("click", function () {
   showConfirmBody();
 });
 
-boostPayBtn.addEventListener("click", initiateBoostPayment);
-
 /* -- Auto-detect: is URL an API endpoint or an app? -- */
 var looksLikeApi = function (url) {
   try {
