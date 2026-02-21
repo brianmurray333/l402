@@ -1493,40 +1493,55 @@ app.post("/api/lottery/enter", async (req, res) => {
     return res.status(401).json({ error: "Invalid L402 token: " + error.message });
   }
 
-  // Look up the pending entry
   const paymentHash = Buffer.from(l402.macaroon, "base64").subarray(0, 32).toString("hex");
-  const pending = pendingLotteryEntries.get(paymentHash);
 
-  if (!pending) {
-    return res.status(400).json({ error: "No pending lottery entry found for this payment." });
+  // Look up actual paid amount from LND (don't rely on in-memory state which is lost across serverless instances)
+  let paidAmountSats = amountSats;
+  try {
+    const invoiceData = await lookupLndInvoice(paymentHash);
+    paidAmountSats = parseInt(invoiceData.value || invoiceData.amt_paid_sat || "0", 10);
+    if (paidAmountSats <= 0) paidAmountSats = amountSats;
+  } catch (err) {
+    console.error("Could not look up lottery invoice amount:", err.message);
+    // Fall back to the amount the client claims (already validated above)
   }
+
+  // Clean up in-memory pending entry if it exists (may have been set by same instance)
+  pendingLotteryEntries.delete(paymentHash);
 
   // Re-check lottery is still active
   if (currentLottery.status !== "active") {
-    pendingLotteryEntries.delete(paymentHash);
     return res.status(409).json({ error: "Lottery round ended while you were paying. Your sats will carry over." });
   }
 
-  // Record the entry
+  // Prevent duplicate entries for the same payment hash
+  if (currentLottery.entries.some((e) => e.paymentHash === paymentHash)) {
+    return res.json({
+      success: true,
+      entry: currentLottery.entries.find((e) => e.paymentHash === paymentHash),
+      lottery: getSafeLotteryState(currentLottery),
+    });
+  }
+
+  // Record the entry using request body data (client re-sends it) + LND-verified amount
   const entry = {
-    lightningAddress: pending.lightningAddress,
-    nodePubkey: pending.nodePubkey,
-    amountSats: pending.amountSats,
+    lightningAddress: hasLnAddress ? lightningAddress : null,
+    nodePubkey: hasPubkey ? nodePubkey : null,
+    amountSats: paidAmountSats,
     paidAt: new Date().toISOString(),
     paymentHash,
   };
 
   currentLottery.entries.push(entry);
-  currentLottery.totalPot += pending.amountSats;
-  pendingLotteryEntries.delete(paymentHash);
+  currentLottery.totalPot += paidAmountSats;
 
   // Persist lottery state to disk after every entry
   await saveLotteryState();
 
-  const entryLabel = pending.lightningAddress
-    ? maskLightningAddress(pending.lightningAddress)
-    : pending.nodePubkey.slice(0, 10) + "...";
-  console.log(`🎫 Lottery entry: ${pending.amountSats} sats from ${entryLabel} — pot now ${currentLottery.totalPot} sats`);
+  const entryLabel = hasLnAddress
+    ? maskLightningAddress(lightningAddress)
+    : nodePubkey.slice(0, 10) + "...";
+  console.log(`🎫 Lottery entry: ${paidAmountSats} sats from ${entryLabel} — pot now ${currentLottery.totalPot} sats`);
 
   res.json({
     success: true,
