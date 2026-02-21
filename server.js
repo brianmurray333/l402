@@ -19,10 +19,10 @@ const APIS_PATH = path.join(DATA_DIR, "apis.json");
 const SUBMISSIONS_PATH = path.join(DATA_DIR, "submissions.json");
 const API_SUBMISSIONS_PATH = path.join(DATA_DIR, "api-submissions.json");
 const BOOSTS_PATH = path.join(DATA_DIR, "boosts.json");
-const LOTTERY_STATE_PATH = path.join(DATA_DIR, "lottery-state.json");
-const LOTTERY_HISTORY_PATH = path.join(DATA_DIR, "lottery-history.json");
 const TMP_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-submissions.json");
 const TMP_API_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-api-submissions.json");
+const TMP_LOTTERY_STATE_PATH = path.join(os.tmpdir(), "l402-lottery-state.json");
+const TMP_LOTTERY_HISTORY_PATH = path.join(os.tmpdir(), "l402-lottery-history.json");
 
 const resend =
   process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim() !== ""
@@ -601,10 +601,30 @@ let currentLottery = null;
 let lotteryHistory = [];
 const pendingLotteryEntries = new Map();
 
-/* Lottery persistence helpers */
+/*
+ * Deterministic lottery rounds — the round boundaries are fixed to wall-clock time
+ * so that every serverless instance agrees on when the current round started / ends,
+ * even across cold starts.  We anchor to midnight UTC 2026-02-21 and step by LOTTERY_DURATION_MS.
+ */
+const LOTTERY_EPOCH = new Date("2026-02-21T00:00:00Z").getTime();
+
+const getCurrentRoundBounds = () => {
+  const now = Date.now();
+  const elapsed = now - LOTTERY_EPOCH;
+  const roundIndex = Math.floor(elapsed / LOTTERY_DURATION_MS);
+  const startedAt = LOTTERY_EPOCH + roundIndex * LOTTERY_DURATION_MS;
+  const endsAt = startedAt + LOTTERY_DURATION_MS;
+  return {
+    roundId: `round-${roundIndex}`,
+    startedAt: new Date(startedAt).toISOString(),
+    endsAt: new Date(endsAt).toISOString(),
+  };
+};
+
+/* Lottery persistence helpers — use /tmp (only writable dir on Vercel serverless) */
 const saveLotteryState = async () => {
   try {
-    await writeJson(LOTTERY_STATE_PATH, currentLottery);
+    await writeJson(TMP_LOTTERY_STATE_PATH, currentLottery);
   } catch (err) {
     console.error("Failed to save lottery state:", err.message);
   }
@@ -612,31 +632,35 @@ const saveLotteryState = async () => {
 
 const saveLotteryHistory = async () => {
   try {
-    await writeJson(LOTTERY_HISTORY_PATH, lotteryHistory);
+    await writeJson(TMP_LOTTERY_HISTORY_PATH, lotteryHistory);
   } catch (err) {
     console.error("Failed to save lottery history:", err.message);
   }
 };
 
 const loadLotteryState = async () => {
-  const saved = await readJson(LOTTERY_STATE_PATH, null);
-  if (saved && saved.status === "active") {
+  const saved = await readJson(TMP_LOTTERY_STATE_PATH, null);
+  const { roundId } = getCurrentRoundBounds();
+
+  // Only restore if the saved state is for the CURRENT round and still active
+  if (saved && saved.id === roundId && saved.status === "active") {
     currentLottery = saved;
-    console.log(`📦 Loaded lottery state: pot=${saved.totalPot} sats, entries=${saved.entries?.length || 0}`);
+    console.log(`📦 Loaded lottery state: round=${roundId}, pot=${saved.totalPot} sats, entries=${saved.entries?.length || 0}`);
   }
-  const savedHistory = await readJson(LOTTERY_HISTORY_PATH, []);
-  if (Array.isArray(savedHistory)) {
+
+  const savedHistory = await readJson(TMP_LOTTERY_HISTORY_PATH, []);
+  if (Array.isArray(savedHistory) && savedHistory.length > 0) {
     lotteryHistory = savedHistory;
     console.log(`📦 Loaded ${lotteryHistory.length} lottery history entries`);
   }
 };
 
 const createNewLottery = async () => {
-  const now = Date.now();
+  const { roundId, startedAt, endsAt } = getCurrentRoundBounds();
   currentLottery = {
-    id: crypto.randomUUID(),
-    startedAt: new Date(now).toISOString(),
-    endsAt: new Date(now + LOTTERY_DURATION_MS).toISOString(),
+    id: roundId,
+    startedAt,
+    endsAt,
     entries: [],
     totalPot: 0,
     status: "active",
