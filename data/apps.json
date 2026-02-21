@@ -1,5 +1,12 @@
 [
   {
+    "name": "Lightning Lottery",
+    "url": "https://www.l402apps.com/lottery",
+    "description": "24h Lightning-powered lottery. Buy tickets with sats — more sats means higher odds. Winner paid automatically via Lightning Address.",
+    "image": "/images/lottery.jpg",
+    "icon": "/images/lottery.jpg"
+  },
+  {
     "name": "Sphinx",
     "url": "https://sphinx.chat",
     "description": "Encrypted messaging over the Lightning Network. No central servers, no data collection. Send bitcoin instantly to anyone.",

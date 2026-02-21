@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lightning Lottery — L402 Apps</title>
+    <meta name="description" content="24-hour Lightning-powered lottery. Buy tickets with sats — more sats means higher odds. Winner paid automatically via Lightning Address." />
+    <meta property="og:title" content="Lightning Lottery — L402 Apps" />
+    <meta property="og:description" content="24-hour Lightning-powered lottery. Buy tickets with sats — more sats means higher odds." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.l402apps.com/lottery" />
+    <meta property="og:image" content="https://www.l402apps.com/images/lottery.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/images/bitcoin.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      /* ── Lottery-specific styles ── */
+      .lottery-main { padding: 0 64px 96px; max-width: 800px; margin: 0 auto; }
+
+      .lottery-hero {
+        text-align: center;
+        padding: 48px 0 32px;
+      }
+      .lottery-hero h1 {
+        font-size: clamp(2rem, 5vw, 3rem);
+        margin: 0 0 8px;
+      }
+      .lottery-hero h1 .lottery-bolt { color: var(--accent); }
+      .lottery-subtitle { color: var(--muted); font-size: 1rem; margin: 0; }
+
+      .lottery-pot-card {
+        margin: 32px auto;
+        max-width: 480px;
+        padding: 32px;
+        border-radius: 20px;
+        background: linear-gradient(140deg, rgba(16, 22, 36, 0.9), rgba(7, 10, 16, 0.6));
+        border: 1px solid var(--stroke);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .lottery-pot-card::before {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        border-radius: 20px;
+        padding: 1px;
+        background: linear-gradient(140deg, rgba(57, 240, 209, 0.3), rgba(91, 124, 250, 0.15), transparent);
+        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        -webkit-mask-composite: xor;
+        pointer-events: none;
+      }
+
+      .pot-label { font-size: 0.85rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+      .pot-amount {
+        font-size: clamp(2.5rem, 7vw, 4rem);
+        font-weight: 700;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin: 0;
+        line-height: 1.1;
+      }
+      .pot-amount-unit { font-size: 0.45em; opacity: 0.7; }
+
+      .pot-meta {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        margin-top: 16px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .pot-meta-item { display: flex; align-items: center; gap: 6px; }
+      .pot-meta-icon { font-size: 1rem; }
+
+      .countdown {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 1.1rem;
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      .lottery-cta {
+        display: block;
+        margin: 28px auto 0;
+        padding: 14px 40px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #020409;
+        font-size: 1.05rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: "Space Grotesk", sans-serif;
+        transition: all 0.2s;
+        box-shadow: 0 8px 24px rgba(57, 240, 209, 0.25);
+      }
+      .lottery-cta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 32px rgba(57, 240, 209, 0.4);
+      }
+
+      /* ── How it works ── */
+      .lottery-how {
+        margin: 48px 0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .lottery-step {
+        padding: 20px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--stroke);
+        background: rgba(9, 12, 20, 0.6);
+        text-align: center;
+      }
+      .lottery-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        background: rgba(57, 240, 209, 0.12);
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-bottom: 10px;
+      }
+      .lottery-step h4 { margin: 0 0 6px; font-size: 0.85rem; }
+      .lottery-step p { margin: 0; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+      /* ── Entries ── */
+      .lottery-section-title {
+        font-size: 1.1rem;
+        margin: 40px 0 16px;
+        color: var(--text);
+      }
+      .lottery-entries {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .lottery-entry-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(9, 12, 20, 0.5);
+        border: 1px solid var(--stroke);
+        font-size: 0.85rem;
+      }
+      .entry-amount { font-weight: 600; color: var(--accent); }
+      .entry-time { color: var(--muted); font-size: 0.8rem; }
+      .lottery-empty { color: var(--muted); font-size: 0.9rem; padding: 20px 0; text-align: center; }
+
+      /* ── History ── */
+      .lottery-history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        border-radius: 10px;
+        background: rgba(9, 12, 20, 0.5);
+        border: 1px solid var(--stroke);
+        font-size: 0.85rem;
+      }
+      .history-winner { color: var(--text); }
+      .history-winner strong { color: var(--accent); }
+      .history-payout { font-weight: 600; color: var(--accent); }
+      .history-date { color: var(--muted); font-size: 0.8rem; }
+      .history-status { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; }
+      .history-status--paid { background: rgba(57, 240, 209, 0.1); color: var(--accent); }
+      .history-status--failed { background: rgba(248, 180, 255, 0.1); color: var(--accent-3); }
+      .history-status--noentries { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+      /* ── Ticket Modal ── */
+      .ticket-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      .ticket-modal.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .ticket-modal-content {
+        background: rgba(13, 17, 26, 0.98);
+        border: 1px solid var(--stroke);
+        border-radius: 20px;
+        padding: 32px;
+        width: 90%;
+        max-width: 420px;
+        position: relative;
+      }
+      .ticket-modal-close {
+        position: absolute;
+        top: 14px; right: 18px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.3rem;
+        cursor: pointer;
+      }
+      .ticket-modal h2 { margin: 0 0 20px; font-size: 1.3rem; }
+      .ticket-modal h2 .ticket-bolt { color: var(--accent); }
+
+      .ticket-field { margin-bottom: 16px; }
+      .ticket-field label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 6px;
+        letter-spacing: 0.05em;
+      }
+      .ticket-field input {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--stroke);
+        background: rgba(5, 7, 11, 0.8);
+        color: var(--text);
+        font-size: 0.95rem;
+        font-family: "Space Grotesk", sans-serif;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .ticket-field input:focus { border-color: var(--accent); }
+      .ticket-field .field-hint {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+      .ticket-odds {
+        font-size: 0.8rem;
+        color: var(--accent);
+        margin-top: 4px;
+      }
+
+      .ticket-submit-btn {
+        width: 100%;
+        padding: 12px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(120deg, var(--accent), var(--accent-2));
+        color: #020409;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: "Space Grotesk", sans-serif;
+        transition: all 0.2s;
+        margin-top: 8px;
+      }
+      .ticket-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      /* Payment step */
+      .ticket-payment {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        text-align: center;
+      }
+      .ticket-payment.is-active { display: flex; }
+      .ticket-qr {
+        width: 220px;
+        height: 220px;
+        border-radius: 12px;
+        background: #0d111a;
+      }
+      .ticket-invoice-row {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+      }
+      .ticket-invoice-text {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--stroke);
+        background: rgba(5, 7, 11, 0.8);
+        color: var(--muted);
+        font-size: 0.7rem;
+        font-family: "IBM Plex Mono", monospace;
+        outline: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .ticket-copy-btn {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--stroke);
+        background: rgba(255,255,255,0.04);
+        color: var(--text);
+        font-size: 0.8rem;
+        cursor: pointer;
+        white-space: nowrap;
+        font-family: "Space Grotesk", sans-serif;
+      }
+      .ticket-status {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .ticket-status--success { color: var(--accent); font-weight: 600; }
+      .ticket-status--error { color: var(--accent-3); }
+
+      /* Confirmation step */
+      .ticket-confirmed { display: none; text-align: center; }
+      .ticket-confirmed.is-active { display: block; }
+      .ticket-confirmed-emoji { font-size: 3rem; margin-bottom: 12px; }
+      .ticket-confirmed h3 { margin: 0 0 8px; color: var(--accent); }
+      .ticket-confirmed p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+      /* ── Footer ── */
+      .lottery-footer {
+        margin-top: 64px;
+        padding: 24px 0;
+        border-top: 1px solid var(--stroke);
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .lottery-footer a { color: var(--accent); text-decoration: none; }
+
+      /* ── Responsive ── */
+      @media (max-width: 900px) {
+        .lottery-main { padding: 0 20px 48px; }
+        .lottery-how { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 600px) {
+        .lottery-main { padding: 0 16px 48px; }
+        .lottery-how { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .lottery-step { padding: 14px 12px; }
+        .pot-meta { gap: 16px; font-size: 0.8rem; }
+        .ticket-modal-content { padding: 24px 20px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="site-header">
+      <div class="brand">
+        <a href="/" style="text-decoration:none"><span class="brand-mark">L402 Apps</span></a>
+      </div>
+      <nav class="site-nav">
+        <a href="/explained.html" class="nav-link-why"><img src="/images/bitcoin.png" alt="" class="nav-icon" />L402?</a>
+        <a href="/#apps">Apps</a>
+        <a href="/#apis">APIs</a>
+        <a href="/#submit" class="nav-submit"><svg class="nav-submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
+      </nav>
+    </header>
+
+    <main class="lottery-main">
+      <section class="lottery-hero">
+        <h1><span class="lottery-bolt">⚡</span> Lightning Lottery</h1>
+        <p class="lottery-subtitle">Buy tickets with sats. More sats = higher odds. Winner paid every 24 hours.</p>
+      </section>
+
+      <div class="lottery-pot-card">
+        <div class="pot-label">Current Pot</div>
+        <p class="pot-amount" id="pot-amount">0 <span class="pot-amount-unit">sats</span></p>
+        <div class="pot-meta">
+          <div class="pot-meta-item">
+            <span class="pot-meta-icon">🎫</span>
+            <span id="entry-count">0</span> entries
+          </div>
+          <div class="pot-meta-item">
+            <span class="pot-meta-icon">⏱</span>
+            <span class="countdown" id="countdown">--:--:--</span>
+          </div>
+        </div>
+        <button class="lottery-cta" id="buy-ticket-btn">🎫 Buy Ticket</button>
+      </div>
+
+      <!-- How it works -->
+      <div class="lottery-how">
+        <div class="lottery-step">
+          <div class="lottery-step-num">1</div>
+          <h4>Buy a Ticket</h4>
+          <p>Contribute sats via Lightning. Minimum 10 sats, no maximum.</p>
+        </div>
+        <div class="lottery-step">
+          <div class="lottery-step-num">2</div>
+          <h4>More Sats = More Odds</h4>
+          <p>Your odds are proportional to your contribution vs the total pot.</p>
+        </div>
+        <div class="lottery-step">
+          <div class="lottery-step-num">3</div>
+          <h4>24h Drawing</h4>
+          <p>When the countdown hits zero, a weighted random winner is selected.</p>
+        </div>
+        <div class="lottery-step">
+          <div class="lottery-step-num">4</div>
+          <h4>Auto Payout</h4>
+          <p>Winnings are sent instantly to the winner's Lightning Address.</p>
+        </div>
+      </div>
+
+      <!-- Recent Entries -->
+      <h3 class="lottery-section-title">Recent Entries</h3>
+      <div class="lottery-entries" id="entries-list">
+        <div class="lottery-empty">No entries yet. Be the first!</div>
+      </div>
+
+      <!-- Past Winners -->
+      <h3 class="lottery-section-title">Past Winners</h3>
+      <div class="lottery-entries" id="history-list">
+        <div class="lottery-empty">No completed lotteries yet.</div>
+      </div>
+
+      <div class="lottery-footer">
+        <p>Powered by <a href="/">L402 Apps</a> · 0% house cut · 100% of the pot goes to the winner</p>
+      </div>
+    </main>
+
+    <!-- Ticket Purchase Modal -->
+    <div class="ticket-modal" id="ticket-modal" aria-hidden="true">
+      <div class="ticket-modal-content">
+        <button class="ticket-modal-close" id="ticket-modal-close">✕</button>
+
+        <!-- Step 1: Form -->
+        <div id="ticket-form-step">
+          <h2><span class="ticket-bolt">⚡</span> Buy Lottery Ticket</h2>
+          <div class="ticket-field">
+            <label>Lightning Address</label>
+            <input type="text" id="ticket-ln-address" placeholder="you@getalby.com" autocomplete="email" />
+            <div class="field-hint">Where we'll send your winnings if you win</div>
+          </div>
+          <div class="ticket-field">
+            <label>Amount (sats)</label>
+            <input type="number" id="ticket-amount" value="100" min="10" max="1000000" />
+            <div class="field-hint">Min 10 sats · More sats = higher chance of winning</div>
+            <div class="ticket-odds" id="ticket-odds"></div>
+          </div>
+          <button class="ticket-submit-btn" id="ticket-get-invoice">Get Invoice</button>
+          <div class="ticket-status" id="ticket-form-status" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Step 2: Payment -->
+        <div class="ticket-payment" id="ticket-payment-step">
+          <h2><span class="ticket-bolt">⚡</span> Pay to Enter</h2>
+          <p style="color:var(--muted);font-size:0.9rem;margin:0">Scan or copy the invoice below</p>
+          <img class="ticket-qr" id="ticket-qr" alt="Lightning Invoice QR" />
+          <div class="ticket-invoice-row">
+            <input class="ticket-invoice-text" id="ticket-invoice-text" readonly />
+            <button class="ticket-copy-btn" id="ticket-copy-btn">Copy</button>
+          </div>
+          <div class="ticket-status" id="ticket-payment-status">Waiting for payment...</div>
+        </div>
+
+        <!-- Step 3: Confirmation -->
+        <div class="ticket-confirmed" id="ticket-confirmed-step">
+          <div class="ticket-confirmed-emoji">🎉</div>
+          <h3>You're in!</h3>
+          <p id="ticket-confirmed-msg">Your entry has been recorded. Good luck!</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="/lottery.js"></script>
+  </body>
+</html>

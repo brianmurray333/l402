@@ -39,6 +39,11 @@ const BASE_BOOST_SATS = 21;
 const LOW_BALANCE_THRESHOLD = parseInt(process.env.LOW_BALANCE_THRESHOLD || "1000", 10);
 const LOW_BALANCE_COOLDOWN_MS = 3600000; // 1 hour
 const BOOST_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const LOTTERY_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const LOTTERY_HOUSE_CUT = 0; // 0% for now
+const LOTTERY_DEFAULT_SATS = 100;
+const LOTTERY_MIN_SATS = 10;
+const LOTTERY_MAX_SATS = 1000000;
 const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 
 const SITE_HOST = process.env.SITE_HOST || "https://www.l402apps.com";
@@ -535,6 +540,20 @@ const getOwnApis = () => [
     verified: true,
     featured: true,
   },
+  {
+    id: "l402apps-lottery",
+    provider: "L402 Apps",
+    name: "Lightning Lottery",
+    method: "POST",
+    endpoint: `${SITE_HOST}/api/lottery/enter`,
+    description: "Enter the 24h Lightning Lottery. More sats = higher winning probability. Winner paid via Lightning Address.",
+    cost: LOTTERY_DEFAULT_SATS,
+    costType: "variable",
+    direction: "charges",
+    icon: "/images/lottery.jpg",
+    verified: true,
+    featured: true,
+  },
 ];
 
 /* ── Boosts ── */
@@ -550,6 +569,170 @@ const getActiveBoostCount = async () => {
 
 const getBoostPrice = (activeBoostCount) => {
   return Math.ceil(BASE_BOOST_SATS * Math.pow(1 + activeBoostCount, 2));
+};
+
+/* ── Lightning Lottery ── */
+let currentLottery = null;
+const lotteryHistory = [];
+const pendingLotteryEntries = new Map();
+
+const createNewLottery = () => {
+  const now = Date.now();
+  currentLottery = {
+    id: crypto.randomUUID(),
+    startedAt: new Date(now).toISOString(),
+    endsAt: new Date(now + LOTTERY_DURATION_MS).toISOString(),
+    entries: [],
+    totalPot: 0,
+    status: "active",
+    winner: null,
+  };
+  return currentLottery;
+};
+
+const maskLightningAddress = (address) => {
+  if (!address) return "***@***.com";
+  const [user, domain] = address.split("@");
+  if (!user || !domain) return "***@***.com";
+  const maskedUser = user.slice(0, 2) + "***";
+  const parts = domain.split(".");
+  const tld = parts.pop();
+  const name = parts.join(".");
+  const maskedDomain = name.slice(0, 2) + "***." + tld;
+  return maskedUser + "@" + maskedDomain;
+};
+
+const getSafeLotteryState = (lottery) => {
+  if (!lottery) return null;
+  return {
+    id: lottery.id,
+    startedAt: lottery.startedAt,
+    endsAt: lottery.endsAt,
+    totalPot: lottery.totalPot,
+    entryCount: lottery.entries.length,
+    status: lottery.status,
+    entries: lottery.entries.map((e) => ({
+      amountSats: e.amountSats,
+      paidAt: e.paidAt,
+    })),
+    winner: lottery.winner
+      ? {
+          maskedAddress: maskLightningAddress(lottery.winner.lightningAddress),
+          amountContributed: lottery.winner.amountContributed,
+          payout: lottery.winner.payout,
+          payoutStatus: lottery.winner.payoutStatus,
+        }
+      : null,
+  };
+};
+
+const payToLightningAddress = async (address, amountSats) => {
+  const [user, domain] = address.split("@");
+  if (!user || !domain) throw new Error("Invalid Lightning Address");
+
+  const lnurlUrl = `https://${domain}/.well-known/lnurlp/${user}`;
+
+  const controller1 = new AbortController();
+  const timeout1 = setTimeout(() => controller1.abort(), 10000);
+  const res1 = await fetch(lnurlUrl, { signal: controller1.signal });
+  clearTimeout(timeout1);
+
+  if (!res1.ok) throw new Error(`LNURL fetch failed: ${res1.status}`);
+  const lnurlData = await res1.json();
+
+  if (lnurlData.tag !== "payRequest") {
+    throw new Error("Not a valid LNURL-pay endpoint");
+  }
+
+  const millisats = amountSats * 1000;
+  if (millisats < lnurlData.minSendable || millisats > lnurlData.maxSendable) {
+    throw new Error(`Amount ${amountSats} sats is outside allowed range`);
+  }
+
+  const callbackUrl = new URL(lnurlData.callback);
+  callbackUrl.searchParams.set("amount", String(millisats));
+
+  const controller2 = new AbortController();
+  const timeout2 = setTimeout(() => controller2.abort(), 10000);
+  const res2 = await fetch(callbackUrl.toString(), { signal: controller2.signal });
+  clearTimeout(timeout2);
+
+  if (!res2.ok) throw new Error(`Invoice request failed: ${res2.status}`);
+  const invoiceData = await res2.json();
+
+  if (!invoiceData.pr) throw new Error("No invoice returned from LNURL");
+
+  await payInvoice(invoiceData.pr);
+  return invoiceData.pr;
+};
+
+const drawLottery = async () => {
+  if (!currentLottery) return;
+
+  if (currentLottery.entries.length === 0) {
+    currentLottery.status = "completed";
+    currentLottery.winner = null;
+    lotteryHistory.unshift({ ...currentLottery, entries: [] });
+    createNewLottery();
+    return;
+  }
+
+  currentLottery.status = "drawing";
+
+  // Weighted random selection
+  const totalWeight = currentLottery.totalPot;
+  let random = Math.floor(Math.random() * totalWeight);
+  let winner = null;
+
+  for (const entry of currentLottery.entries) {
+    random -= entry.amountSats;
+    if (random < 0) {
+      winner = entry;
+      break;
+    }
+  }
+  if (!winner) winner = currentLottery.entries[currentLottery.entries.length - 1];
+
+  const houseCut = Math.floor(currentLottery.totalPot * LOTTERY_HOUSE_CUT);
+  const payout = currentLottery.totalPot - houseCut;
+
+  currentLottery.winner = {
+    lightningAddress: winner.lightningAddress,
+    amountContributed: winner.amountSats,
+    payout,
+    houseCut,
+    payoutStatus: "pending",
+  };
+
+  if (l402Enabled && payout > 0) {
+    try {
+      await payToLightningAddress(winner.lightningAddress, payout);
+      currentLottery.winner.payoutStatus = "paid";
+      console.log(`🎉 Lottery paid ${payout} sats to ${maskLightningAddress(winner.lightningAddress)}`);
+    } catch (err) {
+      console.error("Lottery payout failed:", err.message);
+      currentLottery.winner.payoutStatus = "failed";
+      currentLottery.winner.payoutError = err.message;
+    }
+  }
+
+  currentLottery.status = "completed";
+  lotteryHistory.unshift({
+    ...currentLottery,
+    entries: currentLottery.entries.map((e) => ({ amountSats: e.amountSats, paidAt: e.paidAt })),
+  });
+
+  createNewLottery();
+};
+
+const ensureActiveLottery = async () => {
+  if (!currentLottery) createNewLottery();
+
+  if (currentLottery.status === "active" && Date.now() > new Date(currentLottery.endsAt).getTime()) {
+    await drawLottery();
+  }
+
+  return currentLottery;
 };
 
 /* ── Data Access (with boosts applied) ── */
@@ -668,6 +851,30 @@ app.use(express.json());
 /* Serve index with injected data BEFORE static middleware */
 app.get("/", serveIndex);
 app.get("/index.html", serveIndex);
+
+/* Serve lottery page with injected data */
+const serveLottery = async (_req, res) => {
+  try {
+    let html = await fs.readFile(path.join(PUBLIC_DIR, "lottery.html"), "utf-8");
+    const lottery = await ensureActiveLottery();
+    const safeHistory = lotteryHistory.slice(0, 20).map((l) => getSafeLotteryState(l));
+
+    const injection = `<script>
+      window.__LOTTERY__=${JSON.stringify(getSafeLotteryState(lottery))};
+      window.__LOTTERY_HISTORY__=${JSON.stringify(safeHistory)};
+      window.__L402_ENABLED__=${l402Enabled};
+    </script>`;
+
+    html = html.replace("</head>", `${injection}\n</head>`);
+    res.send(html);
+  } catch (err) {
+    console.error("Error serving lottery:", err.message);
+    res.status(500).send("Internal server error");
+  }
+};
+
+app.get("/lottery", serveLottery);
+app.get("/lottery.html", serveLottery);
 
 app.use(express.static(PUBLIC_DIR, { index: false }));
 
@@ -1088,6 +1295,130 @@ app.get("/api/l402/check/:paymentHash", async (req, res) => {
     console.error("Invoice check error:", error.message);
     res.status(500).json({ error: "Failed to check invoice status" });
   }
+});
+
+/* ── Lottery API Routes ── */
+
+/* GET current lottery state */
+app.get("/api/lottery", async (_req, res) => {
+  const lottery = await ensureActiveLottery();
+  res.json(getSafeLotteryState(lottery));
+});
+
+/* GET lottery history */
+app.get("/api/lottery/history", async (_req, res) => {
+  await ensureActiveLottery(); // trigger draw if needed
+  const safeHistory = lotteryHistory.slice(0, 20).map((l) => getSafeLotteryState(l));
+  res.json(safeHistory);
+});
+
+/* POST enter lottery (L402-gated, variable amount) */
+app.post("/api/lottery/enter", async (req, res) => {
+  if (!l402Enabled) {
+    return res.status(503).json({ error: "L402 not configured" });
+  }
+
+  const lottery = await ensureActiveLottery();
+  if (lottery.status !== "active") {
+    return res.status(409).json({ error: "Lottery is currently drawing. Please wait for the next round." });
+  }
+
+  const { lightningAddress, amountSats: rawAmount } = req.body || {};
+  const amountSats = parseInt(rawAmount || LOTTERY_DEFAULT_SATS, 10);
+
+  if (!lightningAddress || !lightningAddress.includes("@")) {
+    return res.status(400).json({ error: "A valid Lightning Address (e.g. user@wallet.com) is required." });
+  }
+
+  if (!Number.isFinite(amountSats) || amountSats < LOTTERY_MIN_SATS || amountSats > LOTTERY_MAX_SATS) {
+    return res
+      .status(400)
+      .json({ error: `Amount must be between ${LOTTERY_MIN_SATS} and ${LOTTERY_MAX_SATS.toLocaleString()} sats.` });
+  }
+
+  const authHeader = req.headers["authorization"];
+  const l402 = parseL402Header(authHeader);
+
+  if (!l402) {
+    // Issue 402 with invoice
+    try {
+      const { paymentHash, paymentRequest } = await createLndInvoice(
+        amountSats,
+        `Lightning Lottery — ${amountSats} sat entry`
+      );
+      const macaroon = mintL402Token(paymentHash);
+
+      // Store pending entry
+      pendingLotteryEntries.set(paymentHash, { lightningAddress, amountSats });
+
+      let qrDataUrl = "";
+      try {
+        qrDataUrl = await QRCode.toDataURL(paymentRequest.toUpperCase(), {
+          width: 260,
+          margin: 2,
+          color: { dark: "#e5e9f2", light: "#0d111a" },
+        });
+      } catch (_) {}
+
+      return res
+        .status(402)
+        .set("WWW-Authenticate", `L402 macaroon="${macaroon}", invoice="${paymentRequest}"`)
+        .json({
+          error: "Payment required",
+          macaroon,
+          invoice: paymentRequest,
+          paymentHash,
+          amountSats,
+          qrCode: qrDataUrl,
+        });
+    } catch (error) {
+      console.error("Lottery invoice creation error:", error.message);
+      return res.status(500).json({ error: "Failed to create Lightning invoice" });
+    }
+  }
+
+  // Verify L402 token
+  try {
+    verifyL402Token(l402.macaroon, l402.preimage);
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid L402 token: " + error.message });
+  }
+
+  // Look up the pending entry
+  const paymentHash = Buffer.from(l402.macaroon, "base64").subarray(0, 32).toString("hex");
+  const pending = pendingLotteryEntries.get(paymentHash);
+
+  if (!pending) {
+    return res.status(400).json({ error: "No pending lottery entry found for this payment." });
+  }
+
+  // Re-check lottery is still active
+  if (currentLottery.status !== "active") {
+    pendingLotteryEntries.delete(paymentHash);
+    return res.status(409).json({ error: "Lottery round ended while you were paying. Your sats will carry over." });
+  }
+
+  // Record the entry
+  const entry = {
+    lightningAddress: pending.lightningAddress,
+    amountSats: pending.amountSats,
+    paidAt: new Date().toISOString(),
+    paymentHash,
+  };
+
+  currentLottery.entries.push(entry);
+  currentLottery.totalPot += pending.amountSats;
+  pendingLotteryEntries.delete(paymentHash);
+
+  console.log(
+    `🎫 Lottery entry: ${pending.amountSats} sats from ${maskLightningAddress(pending.lightningAddress)} — pot now ${currentLottery.totalPot} sats`
+  );
+
+  res.json({
+    success: true,
+    entry: { amountSats: entry.amountSats, paidAt: entry.paidAt },
+    lottery: getSafeLotteryState(currentLottery),
+  });
 });
 
 /* ── Catch-all ── */
