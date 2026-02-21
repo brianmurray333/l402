@@ -19,6 +19,8 @@ const APIS_PATH = path.join(DATA_DIR, "apis.json");
 const SUBMISSIONS_PATH = path.join(DATA_DIR, "submissions.json");
 const API_SUBMISSIONS_PATH = path.join(DATA_DIR, "api-submissions.json");
 const BOOSTS_PATH = path.join(DATA_DIR, "boosts.json");
+const LOTTERY_STATE_PATH = path.join(DATA_DIR, "lottery-state.json");
+const LOTTERY_HISTORY_PATH = path.join(DATA_DIR, "lottery-history.json");
 const TMP_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-submissions.json");
 const TMP_API_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-api-submissions.json");
 
@@ -596,10 +598,40 @@ const getBoostPrice = (activeBoostCount) => {
 
 /* ── Lightning Lottery ── */
 let currentLottery = null;
-const lotteryHistory = [];
+let lotteryHistory = [];
 const pendingLotteryEntries = new Map();
 
-const createNewLottery = () => {
+/* Lottery persistence helpers */
+const saveLotteryState = async () => {
+  try {
+    await writeJson(LOTTERY_STATE_PATH, currentLottery);
+  } catch (err) {
+    console.error("Failed to save lottery state:", err.message);
+  }
+};
+
+const saveLotteryHistory = async () => {
+  try {
+    await writeJson(LOTTERY_HISTORY_PATH, lotteryHistory);
+  } catch (err) {
+    console.error("Failed to save lottery history:", err.message);
+  }
+};
+
+const loadLotteryState = async () => {
+  const saved = await readJson(LOTTERY_STATE_PATH, null);
+  if (saved && saved.status === "active") {
+    currentLottery = saved;
+    console.log(`📦 Loaded lottery state: pot=${saved.totalPot} sats, entries=${saved.entries?.length || 0}`);
+  }
+  const savedHistory = await readJson(LOTTERY_HISTORY_PATH, []);
+  if (Array.isArray(savedHistory)) {
+    lotteryHistory = savedHistory;
+    console.log(`📦 Loaded ${lotteryHistory.length} lottery history entries`);
+  }
+};
+
+const createNewLottery = async () => {
   const now = Date.now();
   currentLottery = {
     id: crypto.randomUUID(),
@@ -610,6 +642,7 @@ const createNewLottery = () => {
     status: "active",
     winner: null,
   };
+  await saveLotteryState();
   return currentLottery;
 };
 
@@ -701,7 +734,8 @@ const drawLottery = async () => {
     currentLottery.status = "completed";
     currentLottery.winner = null;
     lotteryHistory.unshift({ ...currentLottery, entries: [] });
-    createNewLottery();
+    await saveLotteryHistory();
+    await createNewLottery();
     return;
   }
 
@@ -755,12 +789,18 @@ const drawLottery = async () => {
     ...currentLottery,
     entries: currentLottery.entries.map((e) => ({ amountSats: e.amountSats, paidAt: e.paidAt })),
   });
+  await saveLotteryHistory();
 
-  createNewLottery();
+  await createNewLottery();
 };
 
 const ensureActiveLottery = async () => {
-  if (!currentLottery) createNewLottery();
+  if (!currentLottery) {
+    await loadLotteryState();
+  }
+  if (!currentLottery) {
+    await createNewLottery();
+  }
 
   if (currentLottery.status === "active" && Date.now() > new Date(currentLottery.endsAt).getTime()) {
     await drawLottery();
@@ -1455,6 +1495,9 @@ app.post("/api/lottery/enter", async (req, res) => {
   currentLottery.entries.push(entry);
   currentLottery.totalPot += pending.amountSats;
   pendingLotteryEntries.delete(paymentHash);
+
+  // Persist lottery state to disk after every entry
+  await saveLotteryState();
 
   const entryLabel = pending.lightningAddress
     ? maskLightningAddress(pending.lightningAddress)
