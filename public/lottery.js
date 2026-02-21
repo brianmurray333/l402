@@ -21,6 +21,11 @@
   var confirmedStep = document.getElementById("ticket-confirmed-step");
 
   var lnAddressInput = document.getElementById("ticket-ln-address");
+  var nodePubkeyInput = document.getElementById("ticket-node-pubkey");
+  var fieldLnAddress = document.getElementById("field-ln-address");
+  var fieldNodePubkey = document.getElementById("field-node-pubkey");
+  var payoutToggleBtns = document.querySelectorAll(".payout-toggle-btn");
+  var currentPayoutMethod = "lightning_address";
   var amountInput = document.getElementById("ticket-amount");
   var oddsEl = document.getElementById("ticket-odds");
   var getInvoiceBtn = document.getElementById("ticket-get-invoice");
@@ -236,16 +241,42 @@
 
   amountInput.addEventListener("input", updateOdds);
 
+  // ── Payout method toggle ──
+  payoutToggleBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      payoutToggleBtns.forEach(function (b) { b.classList.remove("is-active"); });
+      btn.classList.add("is-active");
+      currentPayoutMethod = btn.getAttribute("data-method");
+      if (currentPayoutMethod === "lightning_address") {
+        fieldLnAddress.style.display = "";
+        fieldNodePubkey.style.display = "none";
+      } else {
+        fieldLnAddress.style.display = "none";
+        fieldNodePubkey.style.display = "";
+      }
+    });
+  });
+
   // ── Get Invoice ──
   getInvoiceBtn.addEventListener("click", function () {
     var address = (lnAddressInput.value || "").trim();
+    var pubkey = (nodePubkeyInput.value || "").trim();
     var amount = parseInt(amountInput.value || 0, 10);
 
-    if (!address || !address.includes("@")) {
-      formStatus.textContent = "Please enter a valid Lightning Address (e.g. you@wallet.com)";
-      formStatus.className = "ticket-status ticket-status--error";
-      return;
+    if (currentPayoutMethod === "lightning_address") {
+      if (!address || !address.includes("@")) {
+        formStatus.textContent = "Please enter a valid Lightning Address (e.g. you@wallet.com)";
+        formStatus.className = "ticket-status ticket-status--error";
+        return;
+      }
+    } else {
+      if (!pubkey || !/^(02|03)[0-9a-fA-F]{64}$/.test(pubkey)) {
+        formStatus.textContent = "Please enter a valid node pubkey (66 hex chars starting with 02 or 03)";
+        formStatus.className = "ticket-status ticket-status--error";
+        return;
+      }
     }
+
     if (amount < 10) {
       formStatus.textContent = "Minimum entry is 10 sats.";
       formStatus.className = "ticket-status ticket-status--error";
@@ -261,13 +292,17 @@
     formStatus.textContent = "Creating invoice...";
     formStatus.className = "ticket-status";
 
+    var body = { amountSats: amount };
+    if (currentPayoutMethod === "lightning_address") {
+      body.lightningAddress = address;
+    } else {
+      body.nodePubkey = pubkey;
+    }
+
     fetch("/api/lottery/enter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lightningAddress: address,
-        amountSats: amount,
-      }),
+      body: JSON.stringify(body),
     })
       .then(function (r) {
         return r.json().then(function (data) {
@@ -292,8 +327,8 @@
           formStep.style.display = "none";
           paymentStep.classList.add("is-active");
 
-          // Start polling
-          startPaymentPolling(address, amount);
+          // Start polling — pass the body so the L402 confirmation re-sends it
+          startPaymentPolling(body);
         } else if (result.data.error) {
           formStatus.textContent = result.data.error;
           formStatus.className = "ticket-status ticket-status--error";
@@ -325,7 +360,7 @@
   });
 
   // ── Payment Polling ──
-  function startPaymentPolling(address, amount) {
+  function startPaymentPolling(entryBody) {
     if (pollInterval) clearInterval(pollInterval);
 
     pollInterval = setInterval(function () {
@@ -348,10 +383,7 @@
                 "Content-Type": "application/json",
                 Authorization: "L402 " + token,
               },
-              body: JSON.stringify({
-                lightningAddress: address,
-                amountSats: amount,
-              }),
+              body: JSON.stringify(entryBody),
             })
               .then(function (r2) {
                 return r2.json();

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lightning Lottery — L402 Apps</title>
-    <meta name="description" content="24-hour Lightning-powered lottery. Buy tickets with sats — more sats means higher odds. Winner paid automatically via Lightning Address." />
+    <meta name="description" content="24-hour Lightning-powered lottery. Buy tickets with sats — more sats means higher odds. Winner paid automatically via Lightning Address or keysend." />
     <meta property="og:title" content="Lightning Lottery — L402 Apps" />
     <meta property="og:description" content="24-hour Lightning-powered lottery. Buy tickets with sats — more sats means higher odds." />
     <meta property="og:type" content="website" />
@@ -269,6 +269,33 @@
         cursor: not-allowed;
       }
 
+      .payout-toggle {
+        display: flex;
+        gap: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid var(--stroke);
+      }
+      .payout-toggle-btn {
+        flex: 1;
+        padding: 8px 12px;
+        border: none;
+        background: rgba(5, 7, 11, 0.8);
+        color: var(--muted);
+        font-size: 0.8rem;
+        font-weight: 500;
+        cursor: pointer;
+        font-family: "Space Grotesk", sans-serif;
+        transition: all 0.2s;
+      }
+      .payout-toggle-btn + .payout-toggle-btn {
+        border-left: 1px solid var(--stroke);
+      }
+      .payout-toggle-btn.is-active {
+        background: rgba(57, 240, 209, 0.12);
+        color: var(--accent);
+      }
+
       /* Payment step */
       .ticket-payment {
         display: none;
@@ -408,7 +435,7 @@
         <div class="lottery-step">
           <div class="lottery-step-num">4</div>
           <h4>Auto Payout</h4>
-          <p>Winnings are sent instantly to the winner's Lightning Address.</p>
+          <p>Winnings are sent instantly via Lightning Address or keysend to your node.</p>
         </div>
       </div>
 
@@ -437,11 +464,27 @@
         <!-- Step 1: Form -->
         <div id="ticket-form-step">
           <h2><span class="ticket-bolt">⚡</span> Buy Lottery Ticket</h2>
+
           <div class="ticket-field">
+            <label>Payout Method</label>
+            <div class="payout-toggle">
+              <button type="button" class="payout-toggle-btn is-active" data-method="lightning_address">Lightning Address</button>
+              <button type="button" class="payout-toggle-btn" data-method="node_pubkey">Node Pubkey</button>
+            </div>
+          </div>
+
+          <div class="ticket-field" id="field-ln-address">
             <label>Lightning Address</label>
             <input type="text" id="ticket-ln-address" placeholder="you@getalby.com" autocomplete="email" />
             <div class="field-hint">Where we'll send your winnings if you win</div>
           </div>
+
+          <div class="ticket-field" id="field-node-pubkey" style="display:none">
+            <label>Node Pubkey</label>
+            <input type="text" id="ticket-node-pubkey" placeholder="02abc...def (66 hex chars)" spellcheck="false" />
+            <div class="field-hint">Your LN node public key — winnings sent via keysend</div>
+          </div>
+
           <div class="ticket-field">
             <label>Amount (sats)</label>
             <input type="number" id="ticket-amount" value="100" min="10" max="1000000" />

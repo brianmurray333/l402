@@ -137,6 +137,29 @@ const payInvoice = async (paymentRequest) => {
   return data;
 };
 
+const keysendPayment = async (destPubkeyHex, amountSats) => {
+  const preimage = crypto.randomBytes(32);
+  const paymentHash = crypto.createHash("sha256").update(preimage).digest();
+
+  const data = await lndRequest("POST", "/v1/channels/transactions", {
+    dest: Buffer.from(destPubkeyHex, "hex").toString("base64"),
+    amt: String(amountSats),
+    payment_hash: paymentHash.toString("base64"),
+    final_cltv_delta: 40,
+    dest_custom_records: {
+      "5482373484": preimage.toString("base64"),
+    },
+    fee_limit: { fixed: "10" },
+  });
+
+  if (data.payment_error && data.payment_error !== "") {
+    throw new Error(`Keysend failed: ${data.payment_error}`);
+  }
+  return data;
+};
+
+const isValidPubkey = (hex) => /^(02|03)[0-9a-fA-F]{64}$/.test(hex);
+
 const getChannelBalance = async () => {
   const data = await lndRequest("GET", "/v1/balance/channels");
   return parseInt(data.balance || "0", 10);
@@ -546,7 +569,7 @@ const getOwnApis = () => [
     name: "Lightning Lottery",
     method: "POST",
     endpoint: `${SITE_HOST}/api/lottery/enter`,
-    description: "Enter the 24h Lightning Lottery. More sats = higher winning probability. Winner paid via Lightning Address.",
+    description: "Enter the 24h Lightning Lottery. More sats = higher winning probability. Provide a Lightning Address or node pubkey for payout.",
     cost: LOTTERY_DEFAULT_SATS,
     costType: "variable",
     direction: "charges",
@@ -617,7 +640,12 @@ const getSafeLotteryState = (lottery) => {
     })),
     winner: lottery.winner
       ? {
-          maskedAddress: maskLightningAddress(lottery.winner.lightningAddress),
+          maskedAddress: lottery.winner.lightningAddress
+            ? maskLightningAddress(lottery.winner.lightningAddress)
+            : lottery.winner.nodePubkey
+              ? lottery.winner.nodePubkey.slice(0, 8) + "..." + lottery.winner.nodePubkey.slice(-4)
+              : "unknown",
+          payoutMethod: lottery.winner.lightningAddress ? "lightning_address" : "keysend",
           amountContributed: lottery.winner.amountContributed,
           payout: lottery.winner.payout,
           payoutStatus: lottery.winner.payoutStatus,
@@ -697,7 +725,8 @@ const drawLottery = async () => {
   const payout = currentLottery.totalPot - houseCut;
 
   currentLottery.winner = {
-    lightningAddress: winner.lightningAddress,
+    lightningAddress: winner.lightningAddress || null,
+    nodePubkey: winner.nodePubkey || null,
     amountContributed: winner.amountSats,
     payout,
     houseCut,
@@ -706,9 +735,14 @@ const drawLottery = async () => {
 
   if (l402Enabled && payout > 0) {
     try {
-      await payToLightningAddress(winner.lightningAddress, payout);
+      if (winner.lightningAddress) {
+        await payToLightningAddress(winner.lightningAddress, payout);
+        console.log(`🎉 Lottery paid ${payout} sats to ${maskLightningAddress(winner.lightningAddress)}`);
+      } else if (winner.nodePubkey) {
+        await keysendPayment(winner.nodePubkey, payout);
+        console.log(`🎉 Lottery keysent ${payout} sats to ${winner.nodePubkey.slice(0, 10)}...`);
+      }
       currentLottery.winner.payoutStatus = "paid";
-      console.log(`🎉 Lottery paid ${payout} sats to ${maskLightningAddress(winner.lightningAddress)}`);
     } catch (err) {
       console.error("Lottery payout failed:", err.message);
       currentLottery.winner.payoutStatus = "failed";
@@ -1323,11 +1357,18 @@ app.post("/api/lottery/enter", async (req, res) => {
     return res.status(409).json({ error: "Lottery is currently drawing. Please wait for the next round." });
   }
 
-  const { lightningAddress, amountSats: rawAmount } = req.body || {};
+  const { lightningAddress, nodePubkey, amountSats: rawAmount } = req.body || {};
   const amountSats = parseInt(rawAmount || LOTTERY_DEFAULT_SATS, 10);
 
-  if (!lightningAddress || !lightningAddress.includes("@")) {
-    return res.status(400).json({ error: "A valid Lightning Address (e.g. user@wallet.com) is required." });
+  // Must provide either a Lightning Address or a node pubkey
+  const hasLnAddress = lightningAddress && lightningAddress.includes("@");
+  const hasPubkey = nodePubkey && isValidPubkey(nodePubkey);
+
+  if (!hasLnAddress && !hasPubkey) {
+    return res.status(400).json({
+      error:
+        "Provide either a Lightning Address (e.g. user@wallet.com) or a node pubkey (66-char hex starting with 02/03).",
+    });
   }
 
   if (!Number.isFinite(amountSats) || amountSats < LOTTERY_MIN_SATS || amountSats > LOTTERY_MAX_SATS) {
@@ -1348,8 +1389,12 @@ app.post("/api/lottery/enter", async (req, res) => {
       );
       const macaroon = mintL402Token(paymentHash);
 
-      // Store pending entry
-      pendingLotteryEntries.set(paymentHash, { lightningAddress, amountSats });
+      // Store pending entry with whichever payout method was provided
+      pendingLotteryEntries.set(paymentHash, {
+        lightningAddress: hasLnAddress ? lightningAddress : null,
+        nodePubkey: hasPubkey ? nodePubkey : null,
+        amountSats,
+      });
 
       let qrDataUrl = "";
       try {
@@ -1401,6 +1446,7 @@ app.post("/api/lottery/enter", async (req, res) => {
   // Record the entry
   const entry = {
     lightningAddress: pending.lightningAddress,
+    nodePubkey: pending.nodePubkey,
     amountSats: pending.amountSats,
     paidAt: new Date().toISOString(),
     paymentHash,
@@ -1410,9 +1456,10 @@ app.post("/api/lottery/enter", async (req, res) => {
   currentLottery.totalPot += pending.amountSats;
   pendingLotteryEntries.delete(paymentHash);
 
-  console.log(
-    `🎫 Lottery entry: ${pending.amountSats} sats from ${maskLightningAddress(pending.lightningAddress)} — pot now ${currentLottery.totalPot} sats`
-  );
+  const entryLabel = pending.lightningAddress
+    ? maskLightningAddress(pending.lightningAddress)
+    : pending.nodePubkey.slice(0, 10) + "...";
+  console.log(`🎫 Lottery entry: ${pending.amountSats} sats from ${entryLabel} — pot now ${currentLottery.totalPot} sats`);
 
   res.json({
     success: true,
