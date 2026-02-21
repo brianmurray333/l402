@@ -229,38 +229,21 @@
     <!-- ── Boost Modal ── -->
     <div class="modal" id="boost-modal" aria-hidden="true">
       <div class="modal-content modal-content--sm" role="dialog" aria-modal="true" aria-labelledby="boost-title">
-        <div class="modal-header">
-          <h3 id="boost-title">⚡ Boost Listing</h3>
-          <button class="icon-button" type="button" data-boost-modal-close aria-label="Close">
-            ✕
-          </button>
-        </div>
+        <button class="icon-button boost-modal-close-x" type="button" data-boost-modal-close aria-label="Close">
+          ✕
+        </button>
 
-        <!-- Boost confirm body -->
-        <div class="boost-confirm" id="boost-confirm">
-          <p class="boost-item-name" id="boost-item-name"></p>
-          <p class="boost-price-info">
-            Current boost price: <strong><span id="boost-price">21</span> sats</strong>
-          </p>
-          <p class="boost-explain">Boosted items appear at the top of the list for 24 hours. Price increases as more items are boosted.</p>
-          <div class="modal-actions">
-            <button type="button" class="ghost" data-boost-modal-close>Cancel</button>
-            <button type="button" class="primary" id="boost-pay-btn">Pay &amp; Boost</button>
-          </div>
-        </div>
-
-        <!-- Boost payment step -->
-        <div class="modal-payment" id="boost-payment-step" style="display:none">
+        <!-- Boost payment step (shown immediately) -->
+        <div class="modal-payment" id="boost-payment-step">
           <div class="payment-inner">
             <div class="payment-icon-wrap">⚡</div>
-            <h3 class="payment-heading">Pay <span id="boost-payment-amount">21</span> sats to boost</h3>
-            <p class="payment-subtext">Scan the Lightning invoice below or copy it to your wallet.</p>
+            <h3 class="payment-heading">Pay <span id="boost-payment-amount">21</span> sats to boost <span id="boost-item-name"></span></h3>
             <img id="boost-payment-qr" class="payment-qr" alt="Lightning invoice QR code" />
             <div class="payment-invoice-row">
               <input id="boost-payment-invoice-text" type="text" readonly />
               <button type="button" class="ghost payment-copy-btn" id="boost-copy-invoice">Copy</button>
             </div>
-            <p class="payment-status" id="boost-payment-status">Waiting for payment…</p>
+            <p class="payment-status" id="boost-payment-status">Creating invoice...</p>
             <button type="button" class="ghost payment-cancel" data-boost-modal-close>Cancel</button>
           </div>
         </div>

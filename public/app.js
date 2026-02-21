@@ -43,11 +43,8 @@ var apiSaveBtn = document.querySelector("#api-save-btn");
 
 // Boost
 var boostModal = document.querySelector("#boost-modal");
-var boostConfirm = document.querySelector("#boost-confirm");
 var boostPaymentStep = document.querySelector("#boost-payment-step");
 var boostItemName = document.querySelector("#boost-item-name");
-var boostPriceEl = document.querySelector("#boost-price");
-var boostPayBtn = document.querySelector("#boost-pay-btn");
 var boostPaymentAmountEl = document.querySelector("#boost-payment-amount");
 var boostPaymentQrImg = document.querySelector("#boost-payment-qr");
 var boostPaymentInvoiceText = document.querySelector("#boost-payment-invoice-text");
@@ -485,8 +482,6 @@ var closeApiModal = function () {
 var openBoostModal = function () {
   boostModal.classList.add("is-open");
   boostModal.setAttribute("aria-hidden", "false");
-  boostConfirm.style.display = "";
-  boostPaymentStep.style.display = "none";
 };
 
 var closeBoostModal = function () {
@@ -495,8 +490,6 @@ var closeBoostModal = function () {
   boostTarget = null;
   stopBoostPolling();
   boostL402State = null;
-  boostConfirm.style.display = "";
-  boostPaymentStep.style.display = "none";
 };
 
 var stopBoostPolling = function () {
@@ -506,25 +499,17 @@ var stopBoostPolling = function () {
 var startBoostFlow = async function (itemId, itemType, name) {
   boostTarget = { itemId: itemId, itemType: itemType, name: name };
   boostItemName.textContent = name;
-  try {
-    var res = await fetch("/api/boost/price");
-    var data = await res.json();
-    currentBoostPrice = data.priceSats;
-    boostPriceEl.textContent = data.priceSats;
-  } catch (_) {}
+  boostPaymentStatusEl.textContent = "Creating invoice...";
+  boostPaymentStatusEl.className = "payment-status";
+  if (boostPaymentQrImg) boostPaymentQrImg.style.display = "none";
+  boostPaymentInvoiceText.value = "";
   openBoostModal();
-};
-
-var initiateBoostPayment = async function () {
-  if (!boostTarget) return;
-  boostPayBtn.disabled = true;
-  boostPayBtn.textContent = "Creating invoice...";
 
   try {
     var res = await fetch("/api/boost", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: boostTarget.itemId, itemType: boostTarget.itemType }),
+      body: JSON.stringify({ itemId: itemId, itemType: itemType }),
     });
 
     if (res.status === 402) {
@@ -538,8 +523,6 @@ var initiateBoostPayment = async function () {
         boostPaymentQrImg.src = data.qrCode;
         boostPaymentQrImg.style.display = "block";
       }
-      boostConfirm.style.display = "none";
-      boostPaymentStep.style.display = "flex";
       stopBoostPolling();
       boostPollTimer = setInterval(pollBoostPayment, 3000);
     } else {
@@ -547,10 +530,8 @@ var initiateBoostPayment = async function () {
     }
   } catch (err) {
     console.error("Boost error:", err);
-    alert("Could not initiate boost. Please try again.");
-  } finally {
-    boostPayBtn.disabled = false;
-    boostPayBtn.textContent = "Pay & Boost";
+    boostPaymentStatusEl.textContent = "Could not create invoice. Please try again.";
+    boostPaymentStatusEl.className = "payment-status payment-status--error";
   }
 };
 

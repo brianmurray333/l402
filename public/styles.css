@@ -1368,30 +1368,18 @@ textarea:focus {
 /* ── Boost Modal ── */
 .modal-content--sm {
   width: min(520px, 100%);
+  position: relative;
 }
 
-.boost-confirm {
-  padding: 8px 0;
+.boost-modal-close-x {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
 }
 
-.boost-item-name {
-  font-weight: 600;
-  font-size: 1rem;
-  color: var(--text);
-  margin: 0 0 12px;
-}
-
-.boost-price-info {
-  font-size: 0.95rem;
-  color: var(--muted);
-  margin: 0 0 8px;
-}
-
-.boost-explain {
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin: 0 0 20px;
-  line-height: 1.6;
+#boost-modal .modal-payment {
+  display: flex;
 }
 
 /* ── Responsive ── */
