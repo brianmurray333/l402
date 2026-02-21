@@ -60,7 +60,7 @@ body {
   font-family: "IBM Plex Mono", monospace;
   font-weight: 600;
   letter-spacing: 0.32em;
-  font-size: 0.85rem;
+  font-size: 1.15rem;
   color: var(--accent);
 }
 
@@ -71,6 +71,7 @@ body {
 
 .site-nav {
   display: flex;
+  align-items: center;
   gap: 24px;
 }
 
@@ -79,6 +80,8 @@ body {
   text-decoration: none;
   font-weight: 500;
   font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .site-nav a:hover {
@@ -93,27 +96,12 @@ main {
 }
 
 .hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: 48px;
-  align-items: center;
-  padding: 48px 32px;
-  border-radius: 24px;
-  background: linear-gradient(130deg, rgba(20, 26, 40, 0.8), rgba(7, 10, 16, 0.4));
-  border: 1px solid var(--stroke);
-  box-shadow: 0 24px 80px rgba(9, 14, 24, 0.6);
+  padding: 40px 0 24px;
 }
 
 h1 {
   font-size: clamp(2.2rem, 4vw, 3.6rem);
-  margin: 0 0 16px;
-}
-
-.lede {
-  color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1.6;
-  margin-bottom: 28px;
+  margin: 0;
 }
 
 .hero-panel {
@@ -261,6 +249,54 @@ h2 {
   overflow: hidden;
 }
 
+.hovercard-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.hovercard-visit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(57, 240, 209, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(57, 240, 209, 0.3);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.hovercard-visit-btn:hover {
+  background: rgba(57, 240, 209, 0.3);
+}
+
+.hovercard-boost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  border: 1px solid var(--stroke);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.hovercard-boost-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 @media (hover: hover) {
   .app-tile:hover .hovercard,
   .app-tile:focus-within .hovercard {
@@ -275,14 +311,14 @@ h2 {
 }
 
 .hovercard-header + p {
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .hovercard p {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.4;
-  margin: 0 0 18px;
+  margin: 0 0 12px;
 }
 
 .launch {
@@ -953,25 +989,25 @@ textarea:focus {
 .nav-submit {
   display: inline-flex;
   align-items: center;
-  gap: 0;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--stroke);
-  background: rgba(57, 240, 209, 0.06);
-  font-weight: 600;
-  font-size: 0.85rem;
-  transition: all 0.2s ease;
+  gap: 6px;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: color 0.2s ease;
 }
 
 .nav-submit:hover {
-  border-color: var(--accent);
-  background: rgba(57, 240, 209, 0.12);
+  color: var(--accent);
 }
 
 .nav-submit-icon {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
+  display: none;
+}
+
+.nav-submit-plus {
+  font-size: 1.2em;
+  line-height: 1;
+  font-weight: 400;
 }
 
 /* ── Submit Tabs ── */
@@ -1378,21 +1414,11 @@ textarea:focus {
   }
 
   .hero {
-    grid-template-columns: 1fr;
-    padding: 32px 0;
-    border: none;
-    box-shadow: none;
-    background: none;
-    border-radius: 0;
+    padding: 24px 0 16px;
   }
 
   h1 {
     font-size: 1.6rem;
-    margin-bottom: 8px;
-  }
-
-  .lede {
-    display: none;
   }
 
   .tile-grid {
@@ -1463,6 +1489,34 @@ textarea:focus {
   .hovercard-ext-link svg {
     width: 12px;
     height: 12px;
+  }
+
+  .hovercard-actions {
+    display: none;
+  }
+
+  .nav-submit-label {
+    display: none;
+  }
+
+  .nav-submit-plus {
+    display: none;
+  }
+
+  .nav-submit {
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    min-height: auto;
+  }
+
+  .nav-submit .nav-submit-icon {
+    display: block;
+    width: 32px;
+    height: 32px;
+    color: var(--accent);
   }
 }
 
@@ -1539,32 +1593,6 @@ textarea:focus {
   .hovercard-ext-link svg {
     width: 10px;
     height: 10px;
-  }
-
-  .nav-submit-label {
-    display: none;
-  }
-
-  .nav-submit {
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    color: var(--accent);
-    min-height: auto;
-  }
-
-  .nav-submit:hover {
-    background: transparent;
-    border: none;
-  }
-
-  .nav-submit .nav-submit-icon {
-    width: 32px;
-    height: 32px;
-    color: var(--accent);
   }
 
   .api-card {

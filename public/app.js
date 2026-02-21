@@ -208,6 +208,8 @@ appDetailModal.addEventListener("click", function (e) {
   if (e.target === appDetailModal) closeAppDetailModal();
 });
 
+var supportsHover = window.matchMedia("(hover: hover)").matches;
+
 var createTile = function (app) {
   var tile = document.createElement("div");
   tile.className = "app-tile" + (app.boost ? " app-tile--boosted" : "");
@@ -239,11 +241,35 @@ var createTile = function (app) {
   var hoverDesc = document.createElement("p");
   hoverDesc.textContent = app.description || "No description provided yet.";
 
-  hover.append(buildHoverHeader(app), hoverDesc);
+  var hoverActions = document.createElement("div");
+  hoverActions.className = "hovercard-actions";
+
+  var visitBtn = document.createElement("a");
+  visitBtn.className = "hovercard-visit-btn";
+  visitBtn.href = app.url;
+  visitBtn.target = "_blank";
+  visitBtn.rel = "noreferrer";
+  visitBtn.textContent = "Visit →";
+  visitBtn.addEventListener("click", function (e) { e.stopPropagation(); });
+
+  var boostBtn = document.createElement("button");
+  boostBtn.className = "hovercard-boost-btn";
+  boostBtn.textContent = "⚡ Boost";
+  boostBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    startBoostFlow(app.id || app.url, "app", app.name);
+  });
+
+  hoverActions.append(visitBtn, boostBtn);
+  hover.append(buildHoverHeader(app), hoverDesc, hoverActions);
   tile.append(nameLabel, hover);
 
   tile.addEventListener("click", function () {
-    openAppDetailModal(app);
+    // On touch devices (no hover), open the modal
+    if (!supportsHover) {
+      openAppDetailModal(app);
+    }
+    // On desktop, the hovercard has visit+boost, no modal needed
   });
 
   return tile;
