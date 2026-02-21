@@ -24,7 +24,9 @@
   var nodePubkeyInput = document.getElementById("ticket-node-pubkey");
   var fieldLnAddress = document.getElementById("field-ln-address");
   var fieldNodePubkey = document.getElementById("field-node-pubkey");
-  var payoutToggleBtns = document.querySelectorAll(".payout-toggle-btn");
+  var payoutLabel = document.getElementById("payout-label");
+  var payoutMenuBtns = [document.getElementById("payout-menu-btn"), document.getElementById("payout-menu-btn-2")];
+  var payoutMenus = [document.getElementById("payout-menu"), document.getElementById("payout-menu-2")];
   var currentPayoutMethod = "lightning_address";
   var amountInput = document.getElementById("ticket-amount");
   var oddsEl = document.getElementById("ticket-odds");
@@ -241,20 +243,48 @@
 
   amountInput.addEventListener("input", updateOdds);
 
-  // ── Payout method toggle ──
-  payoutToggleBtns.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      payoutToggleBtns.forEach(function (b) { b.classList.remove("is-active"); });
-      btn.classList.add("is-active");
-      currentPayoutMethod = btn.getAttribute("data-method");
-      if (currentPayoutMethod === "lightning_address") {
-        fieldLnAddress.style.display = "";
-        fieldNodePubkey.style.display = "none";
-      } else {
-        fieldLnAddress.style.display = "none";
-        fieldNodePubkey.style.display = "";
-      }
+  // ── Payout method menu ──
+  function closeAllPayoutMenus() {
+    payoutMenus.forEach(function (m) { if (m) m.classList.remove("is-open"); });
+  }
+
+  function switchPayoutMethod(method) {
+    currentPayoutMethod = method;
+    closeAllPayoutMenus();
+    // Update active state on all menu items
+    document.querySelectorAll(".payout-menu-item").forEach(function (item) {
+      item.classList.toggle("is-active", item.getAttribute("data-method") === method);
     });
+    if (method === "lightning_address") {
+      fieldLnAddress.style.display = "";
+      fieldNodePubkey.style.display = "none";
+    } else {
+      fieldLnAddress.style.display = "none";
+      fieldNodePubkey.style.display = "";
+    }
+  }
+
+  payoutMenuBtns.forEach(function (btn) {
+    if (!btn) return;
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var menu = btn.nextElementSibling;
+      var isOpen = menu.classList.contains("is-open");
+      closeAllPayoutMenus();
+      if (!isOpen) menu.classList.add("is-open");
+    });
+  });
+
+  document.querySelectorAll(".payout-menu-item").forEach(function (item) {
+    item.addEventListener("click", function (e) {
+      e.stopPropagation();
+      switchPayoutMethod(item.getAttribute("data-method"));
+    });
+  });
+
+  // Close menus when clicking elsewhere
+  document.addEventListener("click", function () {
+    closeAllPayoutMenus();
   });
 
   // ── Get Invoice ──
