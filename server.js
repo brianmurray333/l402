@@ -2,10 +2,10 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs/promises");
 const crypto = require("crypto");
-const os = require("os");
 const cheerio = require("cheerio");
 const { Resend } = require("resend");
 const QRCode = require("qrcode");
+const { createClient } = require("@supabase/supabase-js");
 require("dotenv").config({ path: ".env.local" });
 require("dotenv").config(); // fallback to .env
 
@@ -16,13 +16,18 @@ const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const DATA_DIR = path.join(ROOT_DIR, "data");
 const APPS_PATH = path.join(DATA_DIR, "apps.json");
 const APIS_PATH = path.join(DATA_DIR, "apis.json");
-const SUBMISSIONS_PATH = path.join(DATA_DIR, "submissions.json");
-const API_SUBMISSIONS_PATH = path.join(DATA_DIR, "api-submissions.json");
-const BOOSTS_PATH = path.join(DATA_DIR, "boosts.json");
-const TMP_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-submissions.json");
-const TMP_API_SUBMISSIONS_PATH = path.join(os.tmpdir(), "l402-api-submissions.json");
-const TMP_LOTTERY_STATE_PATH = path.join(os.tmpdir(), "l402-lottery-state.json");
-const TMP_LOTTERY_HISTORY_PATH = path.join(os.tmpdir(), "l402-lottery-history.json");
+
+/* ── Supabase ── */
+const supabase =
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+    : null;
+
+if (supabase) {
+  console.log("✅ Supabase connected");
+} else {
+  console.log("⚠️  No SUPABASE_URL/KEY — falling back to file-based storage");
+}
 
 const resend =
   process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim() !== ""
@@ -295,6 +300,7 @@ const normalizeUrl = (value) => {
 
 const urlToId = (url) => crypto.createHash("md5").update(url).digest("hex").slice(0, 12);
 
+/* ── Data persistence (Supabase with file fallback) ── */
 const readJson = async (filePath, fallback) => {
   try {
     const data = await fs.readFile(filePath, "utf-8");
@@ -304,37 +310,111 @@ const readJson = async (filePath, fallback) => {
   }
 };
 
-const writeJson = async (filePath, data) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-};
-
+// ── App submissions ──
 const readSubmissions = async () => {
-  const tmp = await readJson(TMP_SUBMISSIONS_PATH, null);
-  if (tmp) return tmp;
-  return readJson(SUBMISSIONS_PATH, []);
+  if (supabase) {
+    const { data, error } = await supabase.from("app_submissions").select("*").order("submitted_at", { ascending: false });
+    if (!error && data) return data.map(row => ({
+      id: row.id, name: row.name, url: row.url, description: row.description,
+      image: row.image, icon: row.icon, status: row.status,
+      paymentHash: row.payment_hash, submittedAt: row.submitted_at,
+    }));
+  }
+  return readJson(path.join(DATA_DIR, "submissions.json"), []);
 };
 
-const writeSubmissions = async (submissions) => {
-  try {
-    await writeJson(SUBMISSIONS_PATH, submissions);
-  } catch (error) {
-    await writeJson(TMP_SUBMISSIONS_PATH, submissions);
+const writeSubmission = async (submission) => {
+  if (supabase) {
+    await supabase.from("app_submissions").upsert({
+      id: submission.id, name: submission.name, url: submission.url,
+      description: submission.description, image: submission.image,
+      icon: submission.icon, status: submission.status || "pending",
+      payment_hash: submission.paymentHash, submitted_at: submission.submittedAt,
+    });
   }
 };
 
+// ── API submissions ──
 const readApiSubmissions = async () => {
-  const tmp = await readJson(TMP_API_SUBMISSIONS_PATH, null);
-  if (tmp) return tmp;
-  return readJson(API_SUBMISSIONS_PATH, []);
+  if (supabase) {
+    const { data, error } = await supabase.from("api_submissions").select("*").order("submitted_at", { ascending: false });
+    if (!error && data) return data.map(row => ({
+      id: row.id, provider: row.provider, name: row.name, method: row.method,
+      endpoint: row.endpoint, description: row.description, cost: row.cost,
+      costType: row.cost_type, direction: row.direction, icon: row.icon,
+      verified: row.verified, verifiedAt: row.verified_at,
+      rewardInvoice: row.reward_invoice, rewardPaid: row.reward_paid,
+      paymentHash: row.payment_hash, submittedAt: row.submitted_at,
+    }));
+  }
+  return readJson(path.join(DATA_DIR, "api-submissions.json"), []);
 };
 
-const writeApiSubmissions = async (entries) => {
-  try {
-    await writeJson(API_SUBMISSIONS_PATH, entries);
-  } catch (error) {
-    await writeJson(TMP_API_SUBMISSIONS_PATH, entries);
+const writeApiSubmission = async (entry) => {
+  if (supabase) {
+    await supabase.from("api_submissions").upsert({
+      id: entry.id, provider: entry.provider, name: entry.name,
+      method: entry.method, endpoint: entry.endpoint,
+      description: entry.description, cost: entry.cost,
+      cost_type: entry.costType, direction: entry.direction,
+      icon: entry.icon, verified: entry.verified,
+      verified_at: entry.verifiedAt, reward_invoice: entry.rewardInvoice,
+      reward_paid: entry.rewardPaid, payment_hash: entry.paymentHash,
+      submitted_at: entry.submittedAt,
+    });
   }
+};
+
+// ── Boosts ──
+const readBoosts = async () => {
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("boosts").select("*")
+      .gt("expires_at", new Date().toISOString());
+    if (!error && data) return data.map(row => ({
+      id: row.id, itemId: row.item_id, itemType: row.item_type,
+      amountSats: row.amount_sats, paymentHash: row.payment_hash,
+      createdAt: row.created_at, expiresAt: row.expires_at,
+    }));
+  }
+  return readJson(path.join(DATA_DIR, "boosts.json"), []);
+};
+
+const writeBoost = async (boost) => {
+  if (supabase) {
+    await supabase.from("boosts").insert({
+      id: boost.id, item_id: boost.itemId, item_type: boost.itemType,
+      amount_sats: boost.amountSats, payment_hash: boost.paymentHash,
+      created_at: boost.createdAt, expires_at: boost.expiresAt,
+    });
+  }
+};
+
+// ── Apps catalog (read from Supabase, fallback to JSON) ──
+const readApps = async () => {
+  if (supabase) {
+    const { data, error } = await supabase.from("apps").select("*").order("sort_order", { ascending: true });
+    if (!error && data && data.length > 0) return data.map(row => ({
+      id: row.id, name: row.name, url: row.url, description: row.description,
+      image: row.image, icon: row.icon,
+    }));
+  }
+  return (await readJson(APPS_PATH, [])).map(a => ({ ...a, id: a.id || urlToId(a.url) }));
+};
+
+// ── APIs catalog (read from Supabase, fallback to JSON) ──
+const readApisCatalog = async () => {
+  if (supabase) {
+    const { data, error } = await supabase.from("apis").select("*").order("created_at", { ascending: true });
+    if (!error && data && data.length > 0) return data.map(row => ({
+      id: row.id, provider: row.provider, name: row.name, method: row.method,
+      endpoint: row.endpoint, docsUrl: row.docs_url, description: row.description,
+      cost: row.cost, costType: row.cost_type, direction: row.direction,
+      icon: row.icon, verified: row.verified, verifiedAt: row.verified_at,
+      featured: row.featured,
+    }));
+  }
+  return readJson(APIS_PATH, []);
 };
 
 const getMeta = ($, key) =>
@@ -469,7 +549,7 @@ const isDuplicateApp = async (url) => {
   const normalized = normalizeUrl(url).replace(/\/+$/, "").toLowerCase();
   if (!normalized) return false;
 
-  const apps = await readJson(APPS_PATH, []);
+  const apps = await readApps();
   const submissions = await readSubmissions();
   const all = [...apps, ...submissions];
 
@@ -483,7 +563,7 @@ const isDuplicateApi = async (url) => {
   const normalized = normalizeUrl(url).replace(/\/+$/, "").toLowerCase();
   if (!normalized) return false;
 
-  const apis = await readJson(APIS_PATH, []);
+  const apis = await readApisCatalog();
   const apiSubs = await readApiSubmissions();
   const all = [...apis, ...apiSubs];
 
@@ -583,9 +663,13 @@ const getOwnApis = () => [
 
 /* ── Boosts ── */
 const getActiveBoosts = async () => {
-  const boosts = await readJson(BOOSTS_PATH, []);
-  const now = new Date().toISOString();
-  return boosts.filter((b) => b.expiresAt > now);
+  const boosts = await readBoosts();
+  // Supabase query already filters expired boosts; file fallback needs filtering
+  if (!supabase) {
+    const now = new Date().toISOString();
+    return boosts.filter((b) => b.expiresAt > now);
+  }
+  return boosts;
 };
 
 const getActiveBoostCount = async () => {
@@ -621,37 +705,104 @@ const getCurrentRoundBounds = () => {
   };
 };
 
-/* Lottery persistence helpers — use /tmp (only writable dir on Vercel serverless) */
+/* Lottery persistence — uses Supabase for cross-instance persistence */
 const saveLotteryState = async () => {
+  if (!supabase || !currentLottery) return;
   try {
-    await writeJson(TMP_LOTTERY_STATE_PATH, currentLottery);
+    await supabase.from("lottery_rounds").upsert({
+      id: currentLottery.id,
+      started_at: currentLottery.startedAt,
+      ends_at: currentLottery.endsAt,
+      total_pot: currentLottery.totalPot,
+      status: currentLottery.status,
+      winner_address: currentLottery.winner?.lightningAddress || null,
+      winner_pubkey: currentLottery.winner?.nodePubkey || null,
+      winner_amount_contributed: currentLottery.winner?.amountContributed || null,
+      winner_payout: currentLottery.winner?.payout || null,
+      winner_house_cut: currentLottery.winner?.houseCut || null,
+      winner_payout_status: currentLottery.winner?.payoutStatus || null,
+      winner_payout_error: currentLottery.winner?.payoutError || null,
+    });
   } catch (err) {
     console.error("Failed to save lottery state:", err.message);
   }
 };
 
-const saveLotteryHistory = async () => {
+const saveLotteryEntry = async (entry, roundId) => {
+  if (!supabase) return;
   try {
-    await writeJson(TMP_LOTTERY_HISTORY_PATH, lotteryHistory);
+    await supabase.from("lottery_entries").insert({
+      round_id: roundId,
+      lightning_address: entry.lightningAddress || null,
+      node_pubkey: entry.nodePubkey || null,
+      amount_sats: entry.amountSats,
+      payment_hash: entry.paymentHash || null,
+      paid_at: entry.paidAt,
+    });
   } catch (err) {
-    console.error("Failed to save lottery history:", err.message);
+    console.error("Failed to save lottery entry:", err.message);
   }
 };
 
 const loadLotteryState = async () => {
-  const saved = await readJson(TMP_LOTTERY_STATE_PATH, null);
   const { roundId } = getCurrentRoundBounds();
 
-  // Only restore if the saved state is for the CURRENT round and still active
-  if (saved && saved.id === roundId && saved.status === "active") {
-    currentLottery = saved;
-    console.log(`📦 Loaded lottery state: round=${roundId}, pot=${saved.totalPot} sats, entries=${saved.entries?.length || 0}`);
-  }
+  if (supabase) {
+    // Load current round from DB
+    const { data: roundData } = await supabase
+      .from("lottery_rounds").select("*").eq("id", roundId).single();
 
-  const savedHistory = await readJson(TMP_LOTTERY_HISTORY_PATH, []);
-  if (Array.isArray(savedHistory) && savedHistory.length > 0) {
-    lotteryHistory = savedHistory;
-    console.log(`📦 Loaded ${lotteryHistory.length} lottery history entries`);
+    if (roundData && roundData.status === "active") {
+      // Load entries for this round
+      const { data: entries } = await supabase
+        .from("lottery_entries").select("*").eq("round_id", roundId).order("paid_at", { ascending: true });
+
+      currentLottery = {
+        id: roundData.id,
+        startedAt: roundData.started_at,
+        endsAt: roundData.ends_at,
+        entries: (entries || []).map(e => ({
+          lightningAddress: e.lightning_address,
+          nodePubkey: e.node_pubkey,
+          amountSats: e.amount_sats,
+          paymentHash: e.payment_hash,
+          paidAt: e.paid_at,
+        })),
+        totalPot: roundData.total_pot,
+        status: roundData.status,
+        winner: roundData.winner_payout_status ? {
+          lightningAddress: roundData.winner_address,
+          nodePubkey: roundData.winner_pubkey,
+          amountContributed: roundData.winner_amount_contributed,
+          payout: roundData.winner_payout,
+          houseCut: roundData.winner_house_cut,
+          payoutStatus: roundData.winner_payout_status,
+          payoutError: roundData.winner_payout_error,
+        } : null,
+      };
+      console.log(`📦 Loaded lottery state: round=${roundId}, pot=${roundData.total_pot} sats, entries=${entries?.length || 0}`);
+    }
+
+    // Load history
+    const { data: historyData } = await supabase
+      .from("lottery_rounds").select("*")
+      .eq("status", "completed")
+      .order("ends_at", { ascending: false })
+      .limit(20);
+
+    if (historyData && historyData.length > 0) {
+      lotteryHistory = historyData.map(r => ({
+        id: r.id, startedAt: r.started_at, endsAt: r.ends_at,
+        totalPot: r.total_pot, status: r.status, entries: [],
+        winner: r.winner_payout_status ? {
+          lightningAddress: r.winner_address, nodePubkey: r.winner_pubkey,
+          amountContributed: r.winner_amount_contributed,
+          payout: r.winner_payout, houseCut: r.winner_house_cut,
+          payoutStatus: r.winner_payout_status, payoutError: r.winner_payout_error,
+        } : null,
+      }));
+      console.log(`📦 Loaded ${lotteryHistory.length} lottery history entries`);
+    }
   }
 };
 
@@ -757,8 +908,8 @@ const drawLottery = async () => {
   if (currentLottery.entries.length === 0) {
     currentLottery.status = "completed";
     currentLottery.winner = null;
+    await saveLotteryState();
     lotteryHistory.unshift({ ...currentLottery, entries: [] });
-    await saveLotteryHistory();
     await createNewLottery();
     return;
   }
@@ -809,11 +960,11 @@ const drawLottery = async () => {
   }
 
   currentLottery.status = "completed";
+  await saveLotteryState();
   lotteryHistory.unshift({
     ...currentLottery,
     entries: currentLottery.entries.map((e) => ({ amountSats: e.amountSats, paidAt: e.paidAt })),
   });
-  await saveLotteryHistory();
 
   await createNewLottery();
 };
@@ -862,10 +1013,7 @@ const applyBoosts = (items, boosts, itemType) => {
 };
 
 const getApps = async () => {
-  const apps = (await readJson(APPS_PATH, [])).map((a) => ({
-    ...a,
-    id: a.id || urlToId(a.url),
-  }));
+  const apps = await readApps();
   const submissions = await readSubmissions();
   const combined = [...apps, ...submissions];
   const boosts = await getActiveBoosts();
@@ -873,7 +1021,7 @@ const getApps = async () => {
 };
 
 const getApis = async () => {
-  const curated = await readJson(APIS_PATH, []);
+  const curated = await readApisCatalog();
   const submitted = await readApiSubmissions();
   const ownApis = getOwnApis();
   const combined = [...ownApis, ...curated, ...submitted];
@@ -1118,14 +1266,12 @@ app.post(
       return res.status(409).json({ error: "This app is already listed." });
     }
 
-    const submissions = await readSubmissions();
     const submission = {
       ...payload,
       id: crypto.randomUUID(),
       submittedAt: new Date().toISOString(),
     };
-    submissions.unshift(submission);
-    await writeSubmissions(submissions);
+    await writeSubmission(submission);
 
     try {
       await sendSubmissionEmail(submission);
@@ -1254,9 +1400,7 @@ app.post("/api/api-submissions", async (req, res) => {
     submittedAt: new Date().toISOString(),
   };
 
-  const apiSubs = await readApiSubmissions();
-  apiSubs.unshift(entry);
-  await writeApiSubmissions(apiSubs);
+  await writeApiSubmission(entry);
 
   try {
     await sendApiSubmissionEmail(entry);
@@ -1344,17 +1488,15 @@ app.post("/api/boost", async (req, res) => {
   }
 
   // Save the boost
-  const boosts = await readJson(BOOSTS_PATH, []);
   const boost = {
     id: crypto.randomUUID(),
     itemId,
     itemType,
     amountSats,
-    boostedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + BOOST_DURATION_MS).toISOString(),
   };
-  boosts.push(boost);
-  await writeJson(BOOSTS_PATH, boosts);
+  await writeBoost(boost);
 
   res.json({ success: true, boost });
 });
@@ -1535,7 +1677,8 @@ app.post("/api/lottery/enter", async (req, res) => {
   currentLottery.entries.push(entry);
   currentLottery.totalPot += paidAmountSats;
 
-  // Persist lottery state to disk after every entry
+  // Persist to Supabase
+  await saveLotteryEntry(entry, currentLottery.id);
   await saveLotteryState();
 
   const entryLabel = hasLnAddress
