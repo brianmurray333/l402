@@ -998,18 +998,13 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text);
+  color: var(--accent);
   font-weight: 500;
   font-size: 0.95rem;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--stroke);
+  border: 1px solid var(--accent);
   transition: all 0.2s ease;
-}
-
-.nav-submit:hover {
-  color: var(--accent);
-  border-color: var(--accent);
 }
 
 .nav-submit-icon {
