@@ -1283,6 +1283,189 @@ app.post(
   }
 );
 
+/* Human-friendly API endpoint page */
+app.get("/api/api-submissions", (_req, res) => {
+  const rewardCopy = l402Enabled
+    ? `Submitters receive ${API_SUBMISSION_REWARD_SATS} sats after successful verification.`
+    : "Submissions are accepted, but Lightning rewards are currently disabled.";
+
+  res
+    .status(200)
+    .type("html")
+    .send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>L402 Apps API - Submit API Endpoint</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: radial-gradient(circle at 0% 0%, #1f2937 0, #0b1220 40%, #060a12 100%);
+        color: #e5e7eb;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+      }
+      .card {
+        width: min(900px, 100%);
+        background: rgba(12, 18, 31, 0.88);
+        border: 1px solid rgba(148, 163, 184, 0.26);
+        border-radius: 18px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+        padding: 28px;
+      }
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(250, 204, 21, 0.4);
+        color: #facc15;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        margin-bottom: 14px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.5rem, 3vw, 2.2rem);
+      }
+      .muted {
+        color: #cbd5e1;
+        margin: 0 0 16px;
+        line-height: 1.55;
+      }
+      .badge {
+        display: inline-block;
+        font-weight: 700;
+        color: #0f172a;
+        background: #38bdf8;
+        border-radius: 8px;
+        padding: 4px 10px;
+        margin-right: 8px;
+      }
+      .endpoint {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        color: #93c5fd;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+        margin: 18px 0;
+      }
+      .panel {
+        background: rgba(15, 23, 42, 0.72);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+        font-size: 1rem;
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+      li + li {
+        margin-top: 8px;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+      pre {
+        margin: 8px 0 0;
+        overflow-x: auto;
+        border-radius: 10px;
+        background: #020617;
+        border: 1px solid rgba(148, 163, 184, 0.26);
+        padding: 12px;
+        color: #e2e8f0;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+      }
+      .btn {
+        text-decoration: none;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 10px 14px;
+      }
+      .btn-primary {
+        color: #0f172a;
+        background: #facc15;
+      }
+      .btn-secondary {
+        color: #dbeafe;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+      }
+      .status {
+        margin-top: 10px;
+        color: #bbf7d0;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="eyebrow">L402 Apps API Endpoint</div>
+      <h1>Submit a verified L402 API</h1>
+      <p class="muted">
+        This route is intended for server-to-server calls.
+        <span class="badge">POST</span>
+        <span class="endpoint">${SITE_HOST}/api/api-submissions</span>
+      </p>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Request body</h2>
+          <ul>
+            <li><code>url</code> (required): the endpoint URL to verify.</li>
+            <li><code>invoice</code> (required when rewards are enabled): a 10-sat BOLT11 invoice for payout.</li>
+            <li><code>description</code> (optional): your endpoint description.</li>
+          </ul>
+          <pre><code>{
+  "url": "https://api.example.com/v1/endpoint",
+  "invoice": "lnbc10n1...",
+  "description": "Optional human-readable description"
+}</code></pre>
+        </article>
+
+        <article class="panel">
+          <h2>Example cURL</h2>
+          <pre><code>curl -X POST "${SITE_HOST}/api/api-submissions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/v1/endpoint",
+    "invoice": "lnbc10n1..."
+  }'</code></pre>
+          <p class="status">${rewardCopy}</p>
+        </article>
+      </section>
+
+      <div class="actions">
+        <a class="btn btn-primary" href="/#submit">Use the web submit flow</a>
+        <a class="btn btn-secondary" href="/api/apis">View API directory endpoint</a>
+      </div>
+    </main>
+  </body>
+</html>`);
+});
+
 /* Submit API Endpoint (site pays user 10 sats) */
 app.post("/api/api-submissions", async (req, res) => {
   const { url, invoice, description: userDesc } = req.body || {};
