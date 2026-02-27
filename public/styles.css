@@ -100,13 +100,18 @@ main {
 }
 
 h1 {
+  display: inline-block;
   font-family: "IBM Plex Mono", monospace;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--accent);
   margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(57, 240, 209, 0.08);
+  border: 1px solid rgba(57, 240, 209, 0.15);
 }
 
 .hero-panel {
@@ -194,7 +199,7 @@ h2 {
 }
 
 .col-heading {
-  font-size: 1.3rem;
+  font-size: 1.8rem;
   margin: 0 0 6px;
 }
 
