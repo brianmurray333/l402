@@ -35,7 +35,7 @@
         <a href="#apps">Apps</a>
         <a href="#apis">APIs</a>
         <a href="/lottery" class="nav-lottery" title="Lightning Lottery">🎰</a>
-        <a href="#submit" class="nav-submit"><svg class="nav-submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
+        <a href="#" class="nav-submit" data-open-submit><svg class="nav-submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
       </nav>
     </header>
 
@@ -63,36 +63,32 @@
           <div class="tile-grid" data-tile-grid></div>
         </section>
       </div>
-
-      <section id="submit" class="submit-section">
-        <div class="section-header">
-          <h2>Submit</h2>
-          <p>Add an app or earn sats by submitting verified L402 API endpoints.</p>
-        </div>
-
-        <form class="submit-form" id="submission-form">
-          <div class="field full">
-            <label for="submit-url">App or API endpoint URL</label>
-            <input
-              id="submit-url"
-              name="submit-url"
-              type="text"
-              placeholder="example.com or api.example.com/v1/resource"
-              required
-            />
-          </div>
-          <button type="submit" class="primary" id="submit-btn">Submit</button>
-          <p class="form-note">
-            We auto-detect whether this is an app or L402 API endpoint.
-            <span id="paywall-note"></span>
-          </p>
-        </form>
-      </section>
     </main>
 
     <footer class="site-footer">
       <span class="footer-badge">Made with <img src="/images/bitcoin.png" alt="Bitcoin" class="bitcoin-logo" /></span>
     </footer>
+
+    <!-- ── Submit Modal ── -->
+    <div class="modal" id="submit-modal" aria-hidden="true">
+      <div class="modal-content modal-content--sm" role="dialog" aria-modal="true" aria-labelledby="submit-modal-title">
+        <div class="modal-header">
+          <h3 id="submit-modal-title">Submit</h3>
+          <button class="icon-button" type="button" data-submit-modal-close aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body submit-modal-body">
+          <p class="submit-modal-desc">Add an app or earn sats by submitting verified L402 API endpoints.</p>
+          <form id="submission-form">
+            <div class="field full">
+              <label for="submit-url">App or API endpoint URL</label>
+              <input id="submit-url" name="submit-url" type="text" placeholder="example.com or api.example.com/v1/resource" required />
+            </div>
+            <button type="submit" class="primary" id="submit-btn">Submit</button>
+            <p class="form-note">We auto-detect whether this is an app or L402 API endpoint. <span id="paywall-note"></span></p>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <!-- ── App Detail Modal ── -->
     <div class="modal" id="app-detail-modal" aria-hidden="true">

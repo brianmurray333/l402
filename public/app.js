@@ -280,6 +280,16 @@ var createTile = function (app) {
 var renderApps = function (apps) {
   tileGrid.innerHTML = "";
   apps.forEach(function (app) { tileGrid.appendChild(createTile(app)); });
+
+  var addTile = document.createElement("div");
+  addTile.className = "app-tile add-tile";
+  addTile.setAttribute("role", "button");
+  addTile.setAttribute("tabindex", "0");
+  addTile.setAttribute("aria-label", "Submit an app");
+  addTile.innerHTML = '<div class="add-tile-inner"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span>Submit</span></div>';
+  addTile.addEventListener("click", openSubmitModal);
+  tileGrid.appendChild(addTile);
+
   if (liveCount) liveCount.textContent = apps.length.toString();
 };
 
@@ -366,9 +376,10 @@ var submitAppWithToken = async function (authToken) {
 var apiGrid = document.querySelector("[data-api-grid]");
 var apiSearchInput = document.querySelector("[data-api-search]");
 var apiFilterContainer = document.querySelector("[data-api-filters]");
-var activeApiFilter = "all";
+var activeDirectionFilter = "all";
+var selectedProviders = {};
 
-var zapIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 10 10-12h-9l1-10z"/></svg>';
+var uprankIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>';
 
 var createApiCard = function (api) {
   var card = document.createElement("div");
@@ -394,10 +405,19 @@ var createApiCard = function (api) {
   providerName.className = "api-card-provider";
   providerName.textContent = api.provider || api.name;
   headerLeft.appendChild(providerName);
-  header.appendChild(headerLeft);
 
-  var headerRight = document.createElement("div");
-  headerRight.className = "api-card-header-right";
+  var uprankBtn = document.createElement("button");
+  uprankBtn.className = "api-uprank";
+  uprankBtn.title = "Uprank this endpoint";
+  uprankBtn.innerHTML = uprankIconSvg;
+  uprankBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    startBoostFlow(api.id, "api", (api.provider || api.name) + " - " + api.name);
+  });
+  headerLeft.appendChild(uprankBtn);
+
+  header.appendChild(headerLeft);
 
   var dirBadge = document.createElement("span");
   var costLabel = "";
@@ -413,20 +433,8 @@ var createApiCard = function (api) {
     dirBadge.className = "api-direction-badge api-direction-badge--charges";
     dirBadge.textContent = "\u26A1 Charges" + costLabel;
   }
-  headerRight.appendChild(dirBadge);
+  header.appendChild(dirBadge);
 
-  var boostBtn = document.createElement("button");
-  boostBtn.className = "api-boost-icon-btn";
-  boostBtn.title = "Boost";
-  boostBtn.innerHTML = zapIconSvg;
-  boostBtn.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    startBoostFlow(api.id, "api", (api.provider || api.name) + " - " + api.name);
-  });
-  headerRight.appendChild(boostBtn);
-
-  header.appendChild(headerRight);
   card.appendChild(header);
 
   var endpointRow = document.createElement("div");
@@ -464,12 +472,13 @@ var createApiCard = function (api) {
 
 var getFilteredApis = function () {
   var search = apiSearchInput ? apiSearchInput.value.toLowerCase().trim() : "";
+  var hasProviderFilter = Object.keys(selectedProviders).length > 0;
   return apisData.filter(function (api) {
-    if (activeApiFilter === "charges" && api.direction === "pays") return false;
-    if (activeApiFilter === "pays" && api.direction !== "pays") return false;
-    if (activeApiFilter !== "all" && activeApiFilter !== "charges" && activeApiFilter !== "pays") {
+    if (activeDirectionFilter === "charges" && api.direction === "pays") return false;
+    if (activeDirectionFilter === "pays" && api.direction !== "pays") return false;
+    if (hasProviderFilter) {
       var provider = (api.provider || api.name || "").toLowerCase();
-      if (provider !== activeApiFilter) return false;
+      if (!selectedProviders[provider]) return false;
     }
     if (search) {
       var text = [api.provider, api.name, api.description, api.endpoint, api.method].join(" ").toLowerCase();
@@ -483,33 +492,76 @@ var renderApiFilters = function () {
   if (!apiFilterContainer) return;
   apiFilterContainer.innerHTML = "";
 
-  var filters = [
+  var directionFilters = [
     { key: "all", label: "All" },
     { key: "charges", label: "Charges" },
     { key: "pays", label: "Pays" }
   ];
 
+  directionFilters.forEach(function (f) {
+    var pill = document.createElement("button");
+    pill.className = "api-filter-pill" + (activeDirectionFilter === f.key ? " active" : "");
+    pill.textContent = f.label;
+    pill.addEventListener("click", function () {
+      activeDirectionFilter = f.key;
+      renderApiFilters();
+      renderApis(getFilteredApis());
+    });
+    apiFilterContainer.appendChild(pill);
+  });
+
+  var providers = [];
   var seen = {};
   apisData.forEach(function (api) {
     var p = api.provider || api.name || "";
     var key = p.toLowerCase();
     if (!seen[key] && p) {
       seen[key] = true;
-      filters.push({ key: key, label: p });
+      providers.push({ key: key, label: p });
     }
   });
 
-  filters.forEach(function (f) {
-    var pill = document.createElement("button");
-    pill.className = "api-filter-pill" + (activeApiFilter === f.key ? " active" : "");
-    pill.textContent = f.label;
-    pill.addEventListener("click", function () {
-      activeApiFilter = f.key;
-      renderApiFilters();
-      renderApis(getFilteredApis());
+  if (providers.length > 0) {
+    var dropdownWrap = document.createElement("div");
+    dropdownWrap.className = "api-filter-dropdown-wrap";
+
+    var selectedCount = Object.keys(selectedProviders).length;
+    var appsPill = document.createElement("button");
+    appsPill.className = "api-filter-pill" + (selectedCount > 0 ? " active" : "");
+    appsPill.textContent = selectedCount > 0 ? "Apps (" + selectedCount + ") \u25BE" : "Apps \u25BE";
+
+    var dropdown = document.createElement("div");
+    dropdown.className = "api-filter-dropdown";
+
+    providers.forEach(function (p) {
+      var lbl = document.createElement("label");
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!selectedProviders[p.key];
+      cb.addEventListener("change", function (e) {
+        e.stopPropagation();
+        if (cb.checked) {
+          selectedProviders[p.key] = true;
+        } else {
+          delete selectedProviders[p.key];
+        }
+        renderApiFilters();
+        renderApis(getFilteredApis());
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(" " + p.label));
+      lbl.addEventListener("click", function (e) { e.stopPropagation(); });
+      dropdown.appendChild(lbl);
     });
-    apiFilterContainer.appendChild(pill);
-  });
+
+    appsPill.addEventListener("click", function (e) {
+      e.stopPropagation();
+      dropdown.classList.toggle("is-open");
+    });
+
+    dropdownWrap.append(appsPill, dropdown);
+    apiFilterContainer.appendChild(dropdownWrap);
+  }
 };
 
 var renderApis = function (apis) {
@@ -617,6 +669,40 @@ var pollBoostPayment = async function () {
   } catch (_err) {}
 };
 
+/* -- Submit Modal -- */
+var submitModal = document.querySelector("#submit-modal");
+
+var openSubmitModal = function () {
+  submitModal.classList.add("is-open");
+  submitModal.setAttribute("aria-hidden", "false");
+  var urlInput = document.querySelector("#submit-url");
+  if (urlInput) setTimeout(function () { urlInput.focus(); }, 100);
+};
+
+var closeSubmitModal = function () {
+  submitModal.classList.remove("is-open");
+  submitModal.setAttribute("aria-hidden", "true");
+};
+
+document.querySelectorAll("[data-submit-modal-close]").forEach(function (btn) {
+  btn.addEventListener("click", closeSubmitModal);
+});
+submitModal.addEventListener("click", function (e) {
+  if (e.target === submitModal) closeSubmitModal();
+});
+
+document.querySelectorAll("[data-open-submit]").forEach(function (link) {
+  link.addEventListener("click", function (e) {
+    e.preventDefault();
+    openSubmitModal();
+  });
+});
+
+document.addEventListener("click", function () {
+  var openDropdown = document.querySelector(".api-filter-dropdown.is-open");
+  if (openDropdown) openDropdown.classList.remove("is-open");
+});
+
 /* -- Event Listeners -- */
 document.querySelectorAll("[data-modal-close]").forEach(function (button) {
   button.addEventListener("click", closeModal);
@@ -641,6 +727,7 @@ boostModal.addEventListener("click", function (event) {
 
 document.addEventListener("keydown", function (event) {
   if (event.key === "Escape") {
+    if (submitModal.classList.contains("is-open")) closeSubmitModal();
     if (appDetailModal.classList.contains("is-open")) closeAppDetailModal();
     if (confirmModal.classList.contains("is-open")) closeModal();
     if (apiConfirmModal.classList.contains("is-open")) closeApiModal();
@@ -716,6 +803,7 @@ submissionForm.addEventListener("submit", async function (event) {
       apiVerifyCost.textContent = data.costType === "variable" ? "Variable" : (data.cost + " sats");
       apiVerifyDescription.textContent = data.description || "No description available";
       apiEditDescription.value = data.description || "";
+      closeSubmitModal();
       openApiModal();
     } catch (error) {
       alert(error.message || "Could not verify endpoint. Make sure it returns HTTP 402 with L402 headers.");
@@ -735,6 +823,7 @@ submissionForm.addEventListener("submit", async function (event) {
       var metadata = await response.json();
     pendingApp = metadata;
     updateConfirmationFields(metadata);
+    closeSubmitModal();
     openModal();
   } catch (error) {
     alert("We could not fetch metadata for that URL. Please try again.");
