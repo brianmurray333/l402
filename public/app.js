@@ -460,12 +460,12 @@ var createApiCard = function (api) {
     copyEndpointToClipboard(api.endpoint || "");
   });
   endpointRow.append(method, endpointPath, copyBtn);
-  card.appendChild(endpointRow);
 
   var desc = document.createElement("p");
   desc.className = "api-card-desc";
   desc.textContent = api.description || api.name || "";
   card.appendChild(desc);
+  card.appendChild(endpointRow);
 
   return card;
 };
