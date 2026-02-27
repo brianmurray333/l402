@@ -364,12 +364,16 @@ var submitAppWithToken = async function (authToken) {
 
 /* -- API Cards -- */
 var apiGrid = document.querySelector("[data-api-grid]");
+var apiSearchInput = document.querySelector("[data-api-search]");
+var apiFilterContainer = document.querySelector("[data-api-filters]");
+var activeApiFilter = "all";
+
+var zapIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 10 10-12h-9l1-10z"/></svg>';
 
 var createApiCard = function (api) {
   var card = document.createElement("div");
   var cls = "api-card";
   if (api.boost) cls += " api-card--boosted";
-  if (api.featured) cls += " api-card--featured";
   card.className = cls;
 
   var header = document.createElement("div");
@@ -386,10 +390,14 @@ var createApiCard = function (api) {
     headerLeft.appendChild(ic);
   }
 
-  var providerName = document.createElement("h3");
+  var providerName = document.createElement("span");
+  providerName.className = "api-card-provider";
   providerName.textContent = api.provider || api.name;
   headerLeft.appendChild(providerName);
   header.appendChild(headerLeft);
+
+  var headerRight = document.createElement("div");
+  headerRight.className = "api-card-header-right";
 
   var dirBadge = document.createElement("span");
   var costLabel = "";
@@ -405,7 +413,20 @@ var createApiCard = function (api) {
     dirBadge.className = "api-direction-badge api-direction-badge--charges";
     dirBadge.textContent = "\u26A1 Charges" + costLabel;
   }
-  header.appendChild(dirBadge);
+  headerRight.appendChild(dirBadge);
+
+  var boostBtn = document.createElement("button");
+  boostBtn.className = "api-boost-icon-btn";
+  boostBtn.title = "Boost";
+  boostBtn.innerHTML = zapIconSvg;
+  boostBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    startBoostFlow(api.id, "api", (api.provider || api.name) + " - " + api.name);
+  });
+  headerRight.appendChild(boostBtn);
+
+  header.appendChild(headerRight);
   card.appendChild(header);
 
   var endpointRow = document.createElement("div");
@@ -433,33 +454,62 @@ var createApiCard = function (api) {
   endpointRow.append(method, endpointPath, copyBtn);
   card.appendChild(endpointRow);
 
-  if (api.boost) {
-    var boostBadge = document.createElement("div");
-    boostBadge.className = "api-boost-badge";
-    boostBadge.textContent = "\u26A1 Boosted";
-    card.appendChild(boostBadge);
-  }
-
-  var descRow = document.createElement("div");
-  descRow.className = "api-card-desc-row";
-
   var desc = document.createElement("p");
   desc.className = "api-card-desc";
   desc.textContent = api.description || api.name || "";
-  descRow.appendChild(desc);
+  card.appendChild(desc);
 
-  var boostBtn = document.createElement("button");
-  boostBtn.className = "boost-btn";
-  boostBtn.textContent = "\u26A1 Boost";
-  boostBtn.addEventListener("click", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-    startBoostFlow(api.id, "api", (api.provider || api.name) + " - " + api.name);
-  });
-  descRow.appendChild(boostBtn);
-
-  card.appendChild(descRow);
   return card;
+};
+
+var getFilteredApis = function () {
+  var search = apiSearchInput ? apiSearchInput.value.toLowerCase().trim() : "";
+  return apisData.filter(function (api) {
+    if (activeApiFilter === "charges" && api.direction === "pays") return false;
+    if (activeApiFilter === "pays" && api.direction !== "pays") return false;
+    if (activeApiFilter !== "all" && activeApiFilter !== "charges" && activeApiFilter !== "pays") {
+      var provider = (api.provider || api.name || "").toLowerCase();
+      if (provider !== activeApiFilter) return false;
+    }
+    if (search) {
+      var text = [api.provider, api.name, api.description, api.endpoint, api.method].join(" ").toLowerCase();
+      if (text.indexOf(search) === -1) return false;
+    }
+    return true;
+  });
+};
+
+var renderApiFilters = function () {
+  if (!apiFilterContainer) return;
+  apiFilterContainer.innerHTML = "";
+
+  var filters = [
+    { key: "all", label: "All" },
+    { key: "charges", label: "Charges" },
+    { key: "pays", label: "Pays" }
+  ];
+
+  var seen = {};
+  apisData.forEach(function (api) {
+    var p = api.provider || api.name || "";
+    var key = p.toLowerCase();
+    if (!seen[key] && p) {
+      seen[key] = true;
+      filters.push({ key: key, label: p });
+    }
+  });
+
+  filters.forEach(function (f) {
+    var pill = document.createElement("button");
+    pill.className = "api-filter-pill" + (activeApiFilter === f.key ? " active" : "");
+    pill.textContent = f.label;
+    pill.addEventListener("click", function () {
+      activeApiFilter = f.key;
+      renderApiFilters();
+      renderApis(getFilteredApis());
+    });
+    apiFilterContainer.appendChild(pill);
+  });
 };
 
 var renderApis = function (apis) {
@@ -809,6 +859,13 @@ var checkL402Status = async function () {
 };
 
 /* -- Init -- */
+if (apiSearchInput) {
+  apiSearchInput.addEventListener("input", function () {
+    renderApis(getFilteredApis());
+  });
+}
+
 checkL402Status();
 renderApps(appsData);
+renderApiFilters();
 renderApis(apisData);
