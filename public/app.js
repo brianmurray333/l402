@@ -947,12 +947,46 @@ var checkL402Status = async function () {
   } catch (_err) {}
 };
 
+/* -- Mobile Tabs -- */
+var mobileTabs = document.querySelectorAll("[data-tab]");
+var apisSection = document.querySelector(".apis-section");
+var appsSection = document.querySelector(".apps-section");
+var isMobile = function () { return window.matchMedia("(max-width: 900px)").matches; };
+
+var setMobileTab = function (tab) {
+  mobileTabs.forEach(function (btn) {
+    btn.classList.toggle("active", btn.getAttribute("data-tab") === tab);
+  });
+  if (isMobile()) {
+    apisSection.classList.toggle("mobile-hidden", tab !== "apis");
+    appsSection.classList.toggle("mobile-hidden", tab !== "apps");
+  }
+};
+
+mobileTabs.forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    setMobileTab(btn.getAttribute("data-tab"));
+  });
+});
+
+window.addEventListener("resize", function () {
+  if (!isMobile()) {
+    apisSection.classList.remove("mobile-hidden");
+    appsSection.classList.remove("mobile-hidden");
+  } else {
+    var activeTab = document.querySelector(".mobile-tab.active");
+    if (activeTab) setMobileTab(activeTab.getAttribute("data-tab"));
+  }
+});
+
 /* -- Init -- */
 if (apiSearchInput) {
   apiSearchInput.addEventListener("input", function () {
     renderApis(getFilteredApis());
   });
 }
+
+if (isMobile()) setMobileTab("apis");
 
 checkL402Status();
 renderApps(appsData);

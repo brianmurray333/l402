@@ -191,6 +191,34 @@ h2 {
   margin: 0;
 }
 
+/* ── Mobile Tabs ── */
+.mobile-tabs {
+  display: none;
+}
+
+.mobile-tab {
+  flex: 1;
+  padding: 10px 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mobile-tab:hover {
+  color: var(--text);
+}
+
+.mobile-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 .content-columns {
   display: grid;
   grid-template-columns: 1fr minmax(0, 340px);
@@ -1593,9 +1621,20 @@ textarea:focus {
     font-size: 1.6rem;
   }
 
+  .mobile-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--stroke);
+    margin-bottom: 20px;
+  }
+
   .content-columns {
-    grid-template-columns: 1fr;
-    gap: 32px;
+    display: block;
+  }
+
+  .content-columns .apis-section.mobile-hidden,
+  .content-columns .apps-section.mobile-hidden {
+    display: none;
   }
 
   .tile-grid {
