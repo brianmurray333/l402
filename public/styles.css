@@ -181,10 +181,29 @@ h2 {
   margin: 0;
 }
 
+.content-columns {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.col-heading {
+  font-size: 1.3rem;
+  margin: 0 0 6px;
+}
+
+.col-subheading {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
 .tile-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
 .app-tile {
@@ -1070,7 +1089,7 @@ textarea:focus {
 
 /* ── APIs Section ── */
 .apis-section {
-  margin-top: 48px;
+  margin-top: 0;
 }
 
 .api-toolbar {
@@ -1489,9 +1508,14 @@ textarea:focus {
     font-size: 1.6rem;
   }
 
+  .content-columns {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
   .tile-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    gap: 10px;
   }
 
   .explained-grid {
