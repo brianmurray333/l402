@@ -91,7 +91,7 @@ body {
 main {
   position: relative;
   z-index: 2;
-  padding: 48px 64px 96px;
+  padding: 32px 64px 96px;
   max-width: 100%;
 }
 
@@ -227,7 +227,7 @@ h2 {
 }
 
 .col-heading {
-  font-size: 1.8rem;
+  font-size: 2.2rem;
   margin: 0 0 6px;
 }
 
