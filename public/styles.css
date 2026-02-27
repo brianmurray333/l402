@@ -1315,7 +1315,7 @@ textarea:focus {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  color: var(--muted);
+  color: var(--accent);
   font-size: 0.6rem;
   font-weight: 500;
 }
