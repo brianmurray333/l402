@@ -100,16 +100,11 @@ main {
 }
 
 .hero {
-  padding: 20px 0 32px;
+  padding: 16px 0 36px;
 }
 
 h1 {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
   margin: 0;
 }
 
@@ -1617,7 +1612,7 @@ textarea:focus {
   }
 
   h1 {
-    font-size: 1.6rem;
+    font-size: clamp(1.4rem, 4vw, 1.8rem);
   }
 
   .mobile-tabs {
