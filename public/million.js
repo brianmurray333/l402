@@ -13,7 +13,6 @@
   var tooltipTitle = document.getElementById("tooltip-title");
   var tooltipMeta = document.getElementById("tooltip-meta");
 
-  var progressFill = document.getElementById("progress-fill");
   var pixelsSold = document.getElementById("pixels-sold");
   var satsRaised = document.getElementById("sats-raised");
   var blockCount = document.getElementById("block-count");
@@ -211,8 +210,6 @@
 
   // ── Stats rendering ──
   function renderStats() {
-    var pct = stats.totalPixels / 1000000 * 100;
-    progressFill.style.width = Math.max(pct, 0.05) + "%";
     pixelsSold.textContent = formatNum(stats.totalPixels);
     satsRaised.textContent = formatNum(stats.totalSats);
     blockCount.textContent = formatNum(stats.blockCount);
