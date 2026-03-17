@@ -61,11 +61,11 @@ body {
 }
 
 .brand-mark {
-  font-family: "IBM Plex Mono", monospace;
-  font-weight: 600;
-  letter-spacing: 0.32em;
-  font-size: 1.15rem;
-  color: var(--accent);
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 1.25rem;
+  color: #ff9900;
 }
 
 .brand-subtitle {
