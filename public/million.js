@@ -84,6 +84,8 @@
         var img = new Image();
         img.onload = (function (block) {
           return function () {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
             ctx.drawImage(this, block.x, block.y, block.width, block.height);
           };
         })(b);
