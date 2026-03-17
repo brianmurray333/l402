@@ -2277,19 +2277,48 @@ app.post("/api/million/buy", async (req, res) => {
     console.error("Could not look up pixel invoice amount:", err.message);
   }
 
-  if (!pendingPixelPurchases.has(paymentHash)) {
-    // Already auto-completed by server-side polling — return current grid state
-    const blocks = await readPixelBlocks();
-    const existing = blocks.find(b => b.paymentHash === paymentHash);
-    if (existing) {
-      return res.json({ success: true, block: existing, stats: await getPixelStats() });
-    }
+  // Check if already completed (e.g. by auto-polling on same instance)
+  const existingBlocks = await readPixelBlocks();
+  const existing = existingBlocks.find(b => b.paymentHash === paymentHash);
+  if (existing) {
+    pendingPixelPurchases.delete(paymentHash);
+    return res.json({ success: true, block: existing, stats: await getPixelStats() });
   }
 
-  const block = await completePixelPurchase(paymentHash, paidAmountSats);
-  if (!block) {
+  // Try in-memory pending data first; fall back to request body (serverless-safe)
+  let purchaseData = pendingPixelPurchases.get(paymentHash);
+  if (!purchaseData) {
+    purchaseData = {
+      x, y, width, height,
+      color: color || "#ff9900",
+      imageData: imageData || null,
+      link: link ? normalizeUrl(link) : link || null,
+      title: title || null,
+      amountSats,
+    };
+  }
+  pendingPixelPurchases.delete(paymentHash);
+
+  const overlaps = await checkPixelOverlap(purchaseData.x, purchaseData.y, purchaseData.width, purchaseData.height);
+  if (overlaps) {
     return res.status(409).json({ error: "Those pixels were claimed while you were paying. Please pick a different region." });
   }
+
+  const block = {
+    id: crypto.randomUUID(),
+    x: purchaseData.x, y: purchaseData.y, width: purchaseData.width, height: purchaseData.height,
+    color: purchaseData.color || "#ff9900",
+    imageData: purchaseData.imageData || null,
+    link: purchaseData.link || null,
+    title: (purchaseData.title || "").trim().slice(0, 100) || null,
+    paymentHash,
+    amountSats: paidAmountSats || purchaseData.amountSats,
+    createdAt: new Date().toISOString(),
+  };
+
+  await writePixelBlock(block);
+  const px = block.width * block.height;
+  console.log(`🟧 Million Sat: ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
 
   res.json({
     success: true,
