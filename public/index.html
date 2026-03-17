@@ -66,6 +66,25 @@
       </div>
     </main>
 
+    <section class="api-docs-banner" aria-label="Programmatic API access">
+      <details>
+        <summary>For agents &amp; developers: Submit endpoints via API</summary>
+        <p>
+          Submit L402 API endpoints programmatically and earn 100 sats per submission.
+          <code>POST https://www.l402apps.com/api/api-submissions</code> with JSON body:
+        </p>
+        <pre><code>{
+  "url": "https://api.example.com/v1/endpoint",
+  "invoice": "lnbc...",
+  "lightningAddress": "you@wallet.com"
+}</code></pre>
+        <p>
+          Provide <strong>url</strong> (required) plus either <strong>invoice</strong> (BOLT11 for 100 sats) or <strong>lightningAddress</strong> as fallback.
+          Full API schema: <a href="/.well-known/l402.json">/.well-known/l402.json</a>
+        </p>
+      </details>
+    </section>
+
     <footer class="site-footer">
       <span class="footer-badge">Made with <img src="/images/bitcoin.png" alt="Bitcoin" class="bitcoin-logo" /></span>
     </footer>

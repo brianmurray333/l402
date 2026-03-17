@@ -481,6 +481,50 @@ textarea:focus {
   margin: 0;
 }
 
+.api-docs-banner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+}
+
+.api-docs-banner summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+.api-docs-banner summary:hover {
+  color: var(--text);
+}
+
+.api-docs-banner p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+
+.api-docs-banner pre {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  color: #93c5fd;
+  margin: 8px 0;
+}
+
+.api-docs-banner code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+.api-docs-banner a {
+  color: #facc15;
+}
+
 .site-footer {
   padding: 36px 64px;
   color: var(--muted);
