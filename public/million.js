@@ -5,13 +5,25 @@
   var stats = window.__PIXEL_STATS__ || { totalPixels: 0, totalSats: 0, blockCount: 0, leaderboard: [] };
 
   var GRID = 1000;
-  var dpr = window.devicePixelRatio || 1;
   var canvas = document.getElementById("grid-canvas");
-  canvas.width = GRID * dpr;
-  canvas.height = GRID * dpr;
-  var ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
+  var ctx;
   var gridWrap = document.getElementById("grid-wrap");
+
+  function resizeCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = GRID * dpr;
+    canvas.height = GRID * dpr;
+    ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    drawGrid();
+  }
+  resizeCanvas();
+
+  (function watchDpr() {
+    window.matchMedia("(resolution: " + window.devicePixelRatio + "dppx)")
+      .addEventListener("change", function () { resizeCanvas(); watchDpr(); }, { once: true });
+  })();
+  window.addEventListener("resize", resizeCanvas);
   var selBox = document.getElementById("selection-box");
   var tooltip = document.getElementById("tooltip");
   var tooltipTitle = document.getElementById("tooltip-title");

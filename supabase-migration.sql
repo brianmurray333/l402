@@ -142,3 +142,18 @@ CREATE TABLE IF NOT EXISTS pixel_blocks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pixel_blocks_coords ON pixel_blocks (x, y);
+
+-- Pending pixel purchases (persists across serverless instance restarts)
+CREATE TABLE IF NOT EXISTS pending_pixel_purchases (
+  payment_hash TEXT PRIMARY KEY,
+  x INTEGER NOT NULL,
+  y INTEGER NOT NULL,
+  width INTEGER NOT NULL,
+  height INTEGER NOT NULL,
+  color TEXT DEFAULT '#ff9900',
+  image_data TEXT,
+  link TEXT,
+  title TEXT,
+  amount_sats INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

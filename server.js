@@ -463,60 +463,39 @@ const getPixelStats = async () => {
   return { totalPixels, totalSats, blockCount: blocks.length, leaderboard };
 };
 
-const pendingPixelPurchases = new Map();
-
-const completePixelPurchase = async (paymentHash, paidAmountSats) => {
-  const pending = pendingPixelPurchases.get(paymentHash);
-  if (!pending) return null;
-  pendingPixelPurchases.delete(paymentHash);
-
-  const overlaps = await checkPixelOverlap(pending.x, pending.y, pending.width, pending.height);
-  if (overlaps) {
-    console.log(`🟧 Million Sat: auto-complete skipped — pixels at (${pending.x},${pending.y}) already taken`);
-    return null;
+const savePendingPixelPurchase = async (paymentHash, data) => {
+  try {
+    await supabase.from("pending_pixel_purchases").upsert({
+      payment_hash: paymentHash,
+      x: data.x, y: data.y, width: data.width, height: data.height,
+      color: data.color || "#ff9900",
+      image_data: data.imageData || null,
+      link: data.link || null,
+      title: data.title || null,
+      amount_sats: data.amountSats,
+    });
+  } catch (err) {
+    console.error("Failed to save pending pixel purchase:", err.message);
   }
-
-  const block = {
-    id: crypto.randomUUID(),
-    x: pending.x, y: pending.y, width: pending.width, height: pending.height,
-    color: pending.color || "#ff9900",
-    imageData: pending.imageData || null,
-    link: pending.link ? normalizeUrl(pending.link) : null,
-    title: (pending.title || "").trim().slice(0, 100) || null,
-    paymentHash,
-    amountSats: paidAmountSats || pending.amountSats,
-    createdAt: new Date().toISOString(),
-  };
-
-  await writePixelBlock(block);
-  const px = block.width * block.height;
-  console.log(`🟧 Million Sat (auto): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
-  return block;
 };
 
-const startPixelPaymentPolling = (paymentHash) => {
-  let attempts = 0;
-  const maxAttempts = 150; // ~5 minutes at 2s intervals
-  const interval = setInterval(async () => {
-    attempts++;
-    if (!pendingPixelPurchases.has(paymentHash) || attempts > maxAttempts) {
-      clearInterval(interval);
-      if (attempts > maxAttempts) pendingPixelPurchases.delete(paymentHash);
-      return;
-    }
-    try {
-      const result = await checkInvoicePaid(paymentHash);
-      if (result.paid) {
-        clearInterval(interval);
-        let paidAmount = 0;
-        try {
-          const inv = await lookupLndInvoice(paymentHash);
-          paidAmount = parseInt(inv.value || inv.amt_paid_sat || "0", 10);
-        } catch (_) {}
-        await completePixelPurchase(paymentHash, paidAmount);
-      }
-    } catch (_) {}
-  }, 2000);
+const loadPendingPixelPurchase = async (paymentHash) => {
+  try {
+    const { data } = await supabase.from("pending_pixel_purchases")
+      .select("*").eq("payment_hash", paymentHash).single();
+    if (!data) return null;
+    return {
+      x: data.x, y: data.y, width: data.width, height: data.height,
+      color: data.color, imageData: data.image_data,
+      link: data.link, title: data.title, amountSats: data.amount_sats,
+    };
+  } catch (_) { return null; }
+};
+
+const deletePendingPixelPurchase = async (paymentHash) => {
+  try {
+    await supabase.from("pending_pixel_purchases").delete().eq("payment_hash", paymentHash);
+  } catch (_) {}
 };
 
 // ── Apps catalog (read from Supabase, fallback to JSON) ──
@@ -2234,7 +2213,7 @@ app.post("/api/million/buy", async (req, res) => {
       );
       const macaroon = mintL402Token(paymentHash);
 
-      pendingPixelPurchases.set(paymentHash, {
+      await savePendingPixelPurchase(paymentHash, {
         x, y, width, height,
         color: color || "#ff9900",
         imageData: imageData || null,
@@ -2242,8 +2221,6 @@ app.post("/api/million/buy", async (req, res) => {
         title: title || null,
         amountSats,
       });
-
-      startPixelPaymentPolling(paymentHash);
 
       let qrDataUrl = "";
       try {
@@ -2288,16 +2265,16 @@ app.post("/api/million/buy", async (req, res) => {
     console.error("Could not look up pixel invoice amount:", err.message);
   }
 
-  // Check if already completed (e.g. by auto-polling on same instance)
+  // Check if already completed
   const existingBlocks = await readPixelBlocks();
   const existing = existingBlocks.find(b => b.paymentHash === paymentHash);
   if (existing) {
-    pendingPixelPurchases.delete(paymentHash);
+    await deletePendingPixelPurchase(paymentHash);
     return res.json({ success: true, block: existing, stats: await getPixelStats() });
   }
 
-  // Try in-memory pending data first; fall back to request body (serverless-safe)
-  let purchaseData = pendingPixelPurchases.get(paymentHash);
+  // Load from DB (persists across serverless instances); fall back to request body
+  let purchaseData = await loadPendingPixelPurchase(paymentHash);
   if (!purchaseData) {
     purchaseData = {
       x, y, width, height,
@@ -2308,7 +2285,7 @@ app.post("/api/million/buy", async (req, res) => {
       amountSats,
     };
   }
-  pendingPixelPurchases.delete(paymentHash);
+  await deletePendingPixelPurchase(paymentHash);
 
   const overlaps = await checkPixelOverlap(purchaseData.x, purchaseData.y, purchaseData.width, purchaseData.height);
   if (overlaps) {
