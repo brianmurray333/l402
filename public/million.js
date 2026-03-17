@@ -9,8 +9,6 @@
   var canvas = document.getElementById("grid-canvas");
   canvas.width = GRID * dpr;
   canvas.height = GRID * dpr;
-  canvas.style.width = GRID + "px";
-  canvas.style.height = GRID + "px";
   var ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
   var gridWrap = document.getElementById("grid-wrap");
