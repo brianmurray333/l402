@@ -779,6 +779,8 @@ submissionForm.addEventListener("submit", async function (event) {
       apiVerifyCost.textContent = data.cost ? (data.cost + " sats") : "Set by provider";
       apiVerifyDescription.textContent = data.description || "No description available";
       apiEditDescription.value = data.description || "";
+      if (!data.description) apiEditDescription.setAttribute("required", "");
+      else apiEditDescription.removeAttribute("required");
       closeSubmitModal();
       openApiModal();
     } catch (error) {
