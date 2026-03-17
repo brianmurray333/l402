@@ -123,7 +123,7 @@
 
     historyList.innerHTML = history
       .map(function (l) {
-        if (!l.winner || l.entryCount === 0) {
+        if (!l.winner && l.entryCount === 0) {
           return (
             '<div class="lottery-history-item">' +
             '<div><span class="history-winner">No entries</span>' +

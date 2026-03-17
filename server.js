@@ -40,7 +40,7 @@ const LND_REST_HOST = rawLndHost && !rawLndHost.startsWith("http") ? `https://${
 const LND_MACAROON_HEX = process.env.LND_MACAROON_HEX || "";
 const MACAROON_SECRET = process.env.MACAROON_SECRET || "";
 const APP_SUBMISSION_PRICE_SATS = 100;
-const API_SUBMISSION_REWARD_SATS = 10;
+const API_SUBMISSION_REWARD_SATS = 100;
 const API_GET_PRICE_SATS = 10;
 const BASE_BOOST_SATS = 21;
 const LOW_BALANCE_THRESHOLD = parseInt(process.env.LOW_BALANCE_THRESHOLD || "1000", 10);
@@ -791,9 +791,24 @@ const loadLotteryState = async () => {
       .limit(20);
 
     if (historyData && historyData.length > 0) {
+      // Query entry counts for all history rounds in one go
+      const historyIds = historyData.map(r => r.id);
+      const { data: countData } = await supabase
+        .from("lottery_entries")
+        .select("round_id")
+        .in("round_id", historyIds);
+
+      const countMap = {};
+      if (countData) {
+        for (const row of countData) {
+          countMap[row.round_id] = (countMap[row.round_id] || 0) + 1;
+        }
+      }
+
       lotteryHistory = historyData.map(r => ({
         id: r.id, startedAt: r.started_at, endsAt: r.ends_at,
         totalPot: r.total_pot, status: r.status, entries: [],
+        entryCount: countMap[r.id] || 0,
         winner: r.winner_payout_status ? {
           lightningAddress: r.winner_address, nodePubkey: r.winner_pubkey,
           amountContributed: r.winner_amount_contributed,
@@ -840,7 +855,7 @@ const getSafeLotteryState = (lottery) => {
     startedAt: lottery.startedAt,
     endsAt: lottery.endsAt,
     totalPot: lottery.totalPot,
-    entryCount: lottery.entries.length,
+    entryCount: lottery.entryCount != null ? lottery.entryCount : lottery.entries.length,
     status: lottery.status,
     entries: lottery.entries.map((e) => ({
       amountSats: e.amountSats,
@@ -909,7 +924,7 @@ const drawLottery = async () => {
     currentLottery.status = "completed";
     currentLottery.winner = null;
     await saveLotteryState();
-    lotteryHistory.unshift({ ...currentLottery, entries: [] });
+    lotteryHistory.unshift({ ...currentLottery, entries: [], entryCount: 0 });
     await createNewLottery();
     return;
   }
@@ -963,6 +978,7 @@ const drawLottery = async () => {
   await saveLotteryState();
   lotteryHistory.unshift({
     ...currentLottery,
+    entryCount: currentLottery.entries.length,
     entries: currentLottery.entries.map((e) => ({ amountSats: e.amountSats, paidAt: e.paidAt })),
   });
 
