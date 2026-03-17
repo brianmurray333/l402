@@ -472,18 +472,22 @@
     fetch("/api/million/grid")
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        blocks = data;
-        drawGrid();
-        renderRecent();
+        if (data.length !== blocks.length) {
+          blocks = data;
+          drawGrid();
+          renderRecent();
+        }
       })
       .catch(function () {});
 
     fetch("/api/million/stats")
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        stats = data;
-        renderStats();
-        renderLeaderboard();
+        if (data.totalPixels !== stats.totalPixels || data.blockCount !== stats.blockCount) {
+          stats = data;
+          renderStats();
+          renderLeaderboard();
+        }
       })
       .catch(function () {});
   }
@@ -494,5 +498,5 @@
   renderLeaderboard();
   renderRecent();
 
-  setInterval(refreshData, 30000);
+  setInterval(refreshData, 5000);
 })();
