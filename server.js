@@ -410,7 +410,8 @@ const readPixelBlocks = async () => {
       pixelBlocksCache = data.map(row => ({
         id: row.id, x: row.x, y: row.y, width: row.width, height: row.height,
         color: row.color, imageData: row.image_data, link: row.link,
-        title: row.title, amountSats: row.amount_sats, createdAt: row.created_at,
+        title: row.title, paymentHash: row.payment_hash,
+        amountSats: row.amount_sats, createdAt: row.created_at,
       }));
       pixelBlocksCacheTime = Date.now();
       return pixelBlocksCache;
@@ -463,6 +464,60 @@ const getPixelStats = async () => {
 };
 
 const pendingPixelPurchases = new Map();
+
+const completePixelPurchase = async (paymentHash, paidAmountSats) => {
+  const pending = pendingPixelPurchases.get(paymentHash);
+  if (!pending) return null;
+  pendingPixelPurchases.delete(paymentHash);
+
+  const overlaps = await checkPixelOverlap(pending.x, pending.y, pending.width, pending.height);
+  if (overlaps) {
+    console.log(`🟧 Million Sat: auto-complete skipped — pixels at (${pending.x},${pending.y}) already taken`);
+    return null;
+  }
+
+  const block = {
+    id: crypto.randomUUID(),
+    x: pending.x, y: pending.y, width: pending.width, height: pending.height,
+    color: pending.color || "#ff9900",
+    imageData: pending.imageData || null,
+    link: pending.link ? normalizeUrl(pending.link) : null,
+    title: (pending.title || "").trim().slice(0, 100) || null,
+    paymentHash,
+    amountSats: paidAmountSats || pending.amountSats,
+    createdAt: new Date().toISOString(),
+  };
+
+  await writePixelBlock(block);
+  const px = block.width * block.height;
+  console.log(`🟧 Million Sat (auto): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
+  return block;
+};
+
+const startPixelPaymentPolling = (paymentHash) => {
+  let attempts = 0;
+  const maxAttempts = 150; // ~5 minutes at 2s intervals
+  const interval = setInterval(async () => {
+    attempts++;
+    if (!pendingPixelPurchases.has(paymentHash) || attempts > maxAttempts) {
+      clearInterval(interval);
+      if (attempts > maxAttempts) pendingPixelPurchases.delete(paymentHash);
+      return;
+    }
+    try {
+      const result = await checkInvoicePaid(paymentHash);
+      if (result.paid) {
+        clearInterval(interval);
+        let paidAmount = 0;
+        try {
+          const inv = await lookupLndInvoice(paymentHash);
+          paidAmount = parseInt(inv.value || inv.amt_paid_sat || "0", 10);
+        } catch (_) {}
+        await completePixelPurchase(paymentHash, paidAmount);
+      }
+    } catch (_) {}
+  }, 2000);
+};
 
 // ── Apps catalog (read from Supabase, fallback to JSON) ──
 const readApps = async () => {
@@ -2172,10 +2227,12 @@ app.post("/api/million/buy", async (req, res) => {
         x, y, width, height,
         color: color || "#ff9900",
         imageData: imageData || null,
-        link: link || null,
+        link: link ? normalizeUrl(link) : link || null,
         title: title || null,
         amountSats,
       });
+
+      startPixelPaymentPolling(paymentHash);
 
       let qrDataUrl = "";
       try {
@@ -2220,29 +2277,19 @@ app.post("/api/million/buy", async (req, res) => {
     console.error("Could not look up pixel invoice amount:", err.message);
   }
 
-  pendingPixelPurchases.delete(paymentHash);
-
-  const overlaps = await checkPixelOverlap(x, y, width, height);
-  if (overlaps) {
-    return res.status(409).json({ error: "Those pixels were claimed while you were paying. Please pick a different region." });
+  if (!pendingPixelPurchases.has(paymentHash)) {
+    // Already auto-completed by server-side polling — return current grid state
+    const blocks = await readPixelBlocks();
+    const existing = blocks.find(b => b.paymentHash === paymentHash);
+    if (existing) {
+      return res.json({ success: true, block: existing, stats: await getPixelStats() });
+    }
   }
 
-  const block = {
-    id: crypto.randomUUID(),
-    x, y, width, height,
-    color: color || "#ff9900",
-    imageData: imageData || null,
-    link: link ? normalizeUrl(link) : null,
-    title: (title || "").trim().slice(0, 100) || null,
-    paymentHash,
-    amountSats: paidAmountSats,
-    createdAt: new Date().toISOString(),
-  };
-
-  await writePixelBlock(block);
-
-  const totalPixelsFinal = width * height;
-  console.log(`🟧 Million Sat: ${totalPixelsFinal} pixel${totalPixelsFinal === 1 ? "" : "s"} bought at (${x},${y}) for ${paidAmountSats} sats — "${block.title || "Anonymous"}"`);
+  const block = await completePixelPurchase(paymentHash, paidAmountSats);
+  if (!block) {
+    return res.status(409).json({ error: "Those pixels were claimed while you were paying. Please pick a different region." });
+  }
 
   res.json({
     success: true,
