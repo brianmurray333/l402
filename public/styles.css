@@ -61,11 +61,12 @@ body {
 }
 
 .brand-mark {
-  font-family: "Pacifico", cursive;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  font-size: 1.35rem;
+  font-family: "Inter", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  font-size: 1.15rem;
   color: #ffffff;
+  text-transform: uppercase;
 }
 
 .brand-subtitle {
