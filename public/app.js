@@ -248,14 +248,13 @@ var createTile = function (app) {
   tile.setAttribute("tabindex", "0");
   tile.setAttribute("aria-label", app.name);
 
+  tile.appendChild(buildPlaceholder(app.name));
   var imageUrl = getTileImage(app);
   if (imageUrl) {
     var image = document.createElement("div");
     image.className = "tile-image";
     image.style.backgroundImage = 'url("' + imageUrl + '")';
     tile.appendChild(image);
-  } else {
-    tile.appendChild(buildPlaceholder(app.name));
   }
 
   if (app.boost) {
