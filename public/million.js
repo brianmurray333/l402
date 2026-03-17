@@ -5,8 +5,14 @@
   var stats = window.__PIXEL_STATS__ || { totalPixels: 0, totalSats: 0, blockCount: 0, leaderboard: [] };
 
   var GRID = 1000;
+  var dpr = window.devicePixelRatio || 1;
   var canvas = document.getElementById("grid-canvas");
+  canvas.width = GRID * dpr;
+  canvas.height = GRID * dpr;
+  canvas.style.width = GRID + "px";
+  canvas.style.height = GRID + "px";
   var ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
   var gridWrap = document.getElementById("grid-wrap");
   var selBox = document.getElementById("selection-box");
   var tooltip = document.getElementById("tooltip");
