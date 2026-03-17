@@ -127,6 +127,35 @@ var syncPreview = function () {
 
 var getTileImage = function (app) { return app.image || app.icon || ""; };
 
+var placeholderGradients = [
+  ["#1a1a2e", "#16213e", "#0f3460"],
+  ["#1b1b2f", "#162447", "#1f4068"],
+  ["#0d1117", "#161b22", "#21262d"],
+  ["#1a1423", "#2d1b69", "#11998e"],
+  ["#0f0c29", "#302b63", "#24243e"],
+  ["#1c1c3c", "#2a0845", "#6441a5"],
+  ["#0c0c1d", "#1a2a6c", "#b21f1f"],
+  ["#141e30", "#243b55", "#2c5364"],
+];
+
+var hashStr = function (s) {
+  for (var h = 0, i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
+var buildPlaceholder = function (name) {
+  var el = document.createElement("div");
+  el.className = "tile-placeholder";
+  var idx = hashStr(name || "") % placeholderGradients.length;
+  var g = placeholderGradients[idx];
+  el.style.background = "linear-gradient(135deg, " + g[0] + ", " + g[1] + ", " + g[2] + ")";
+  var letter = document.createElement("span");
+  letter.className = "tile-placeholder-letter";
+  letter.textContent = (name || "?").charAt(0).toUpperCase();
+  el.appendChild(letter);
+  return el;
+};
+
 var externalLinkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
 
 var buildHoverHeader = function (app) {
@@ -225,6 +254,8 @@ var createTile = function (app) {
     image.className = "tile-image";
     image.style.backgroundImage = 'url("' + imageUrl + '")';
     tile.appendChild(image);
+  } else {
+    tile.appendChild(buildPlaceholder(app.name));
   }
 
   if (app.boost) {
@@ -397,8 +428,18 @@ var createApiCard = function (api) {
     ic.src = api.icon;
     ic.alt = "";
     ic.className = "api-card-icon";
-    ic.onerror = function () { this.style.display = "none"; };
+    ic.onerror = function () {
+      var fallback = document.createElement("span");
+      fallback.className = "api-card-icon-fallback";
+      fallback.textContent = ((api.provider || api.name || "?").charAt(0)).toUpperCase();
+      this.parentNode.replaceChild(fallback, this);
+    };
     headerLeft.appendChild(ic);
+  } else {
+    var fallback = document.createElement("span");
+    fallback.className = "api-card-icon-fallback";
+    fallback.textContent = ((api.provider || api.name || "?").charAt(0)).toUpperCase();
+    headerLeft.appendChild(fallback);
   }
 
   var providerName = document.createElement("span");
@@ -797,16 +838,22 @@ submissionForm.addEventListener("submit", async function (event) {
       if (!response.ok) throw new Error(data.error || "Verification failed.");
 
       pendingApiVerification = data;
+      var confirmTitle = document.querySelector("#api-confirm-title");
+      if (confirmTitle) {
+        confirmTitle.textContent = data.type === "compatible"
+          ? "✓ L402-Compatible Endpoint"
+          : "✓ Verified L402 Endpoint";
+      }
       apiVerifyProvider.textContent = data.provider || "Unknown";
       apiVerifyMethod.textContent = data.method || "GET";
       apiVerifyEndpoint.textContent = data.endpoint || url;
-      apiVerifyCost.textContent = data.costType === "variable" ? "Variable" : (data.cost + " sats");
+      apiVerifyCost.textContent = data.cost ? (data.cost + " sats") : "Set by provider";
       apiVerifyDescription.textContent = data.description || "No description available";
       apiEditDescription.value = data.description || "";
       closeSubmitModal();
       openApiModal();
     } catch (error) {
-      alert(error.message || "Could not verify endpoint. Make sure it returns HTTP 402 with L402 headers.");
+      alert(error.message || "Could not verify endpoint. Make sure it returns HTTP 402 or 401 (L402-compatible).");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "Submit";
