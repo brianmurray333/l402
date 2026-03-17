@@ -122,3 +122,23 @@ CREATE TABLE IF NOT EXISTS lottery_entries (
 
 CREATE INDEX IF NOT EXISTS idx_lottery_entries_round ON lottery_entries (round_id);
 CREATE INDEX IF NOT EXISTS idx_lottery_entries_payment ON lottery_entries (payment_hash);
+
+-- ══════════════════════════════════════
+-- 8. Million Sat Homepage — pixel blocks
+-- ══════════════════════════════════════
+CREATE TABLE IF NOT EXISTS pixel_blocks (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  x INTEGER NOT NULL,
+  y INTEGER NOT NULL,
+  width INTEGER NOT NULL CHECK (width >= 1),
+  height INTEGER NOT NULL CHECK (height >= 1),
+  color TEXT DEFAULT '#ff9900',
+  image_data TEXT,
+  link TEXT,
+  title TEXT,
+  payment_hash TEXT UNIQUE,
+  amount_sats INTEGER NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pixel_blocks_coords ON pixel_blocks (x, y);

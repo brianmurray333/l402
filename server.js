@@ -51,6 +51,10 @@ const LOTTERY_HOUSE_CUT = 0; // 0% for now
 const LOTTERY_DEFAULT_SATS = 100;
 const LOTTERY_MIN_SATS = 100;
 const LOTTERY_MAX_SATS = 1000000;
+const MILLION_GRID_SIZE = 1000;
+const MILLION_TOTAL_PIXELS = MILLION_GRID_SIZE * MILLION_GRID_SIZE;
+const MILLION_MIN_PIXELS = 1;
+const MILLION_MAX_PIXELS = 10000;
 const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 
 const SITE_HOST = process.env.SITE_HOST || "https://www.l402apps.com";
@@ -390,6 +394,76 @@ const writeBoost = async (boost) => {
   }
 };
 
+// ── Million Sat Homepage (pixel blocks) ──
+let pixelBlocksCache = [];
+let pixelBlocksCacheTime = 0;
+const PIXEL_CACHE_TTL = 10000;
+
+const readPixelBlocks = async () => {
+  if (Date.now() - pixelBlocksCacheTime < PIXEL_CACHE_TTL && pixelBlocksCache.length > 0) {
+    return pixelBlocksCache;
+  }
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("pixel_blocks").select("*").order("created_at", { ascending: true });
+    if (!error && data) {
+      pixelBlocksCache = data.map(row => ({
+        id: row.id, x: row.x, y: row.y, width: row.width, height: row.height,
+        color: row.color, imageData: row.image_data, link: row.link,
+        title: row.title, amountSats: row.amount_sats, createdAt: row.created_at,
+      }));
+      pixelBlocksCacheTime = Date.now();
+      return pixelBlocksCache;
+    }
+  }
+  return readJson(path.join(DATA_DIR, "pixel-blocks.json"), []);
+};
+
+const writePixelBlock = async (block) => {
+  if (supabase) {
+    await supabase.from("pixel_blocks").insert({
+      id: block.id, x: block.x, y: block.y, width: block.width, height: block.height,
+      color: block.color || "#ff9900", image_data: block.imageData || null,
+      link: block.link || null, title: block.title || null,
+      payment_hash: block.paymentHash, amount_sats: block.amountSats,
+      created_at: block.createdAt,
+    });
+  }
+  pixelBlocksCache = [];
+  pixelBlocksCacheTime = 0;
+};
+
+const checkPixelOverlap = async (x, y, w, h) => {
+  const blocks = await readPixelBlocks();
+  for (const b of blocks) {
+    if (x < b.x + b.width && x + w > b.x && y < b.y + b.height && y + h > b.y) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const getPixelStats = async () => {
+  const blocks = await readPixelBlocks();
+  let totalPixels = 0;
+  let totalSats = 0;
+  const owners = {};
+  for (const b of blocks) {
+    const px = b.width * b.height;
+    totalPixels += px;
+    totalSats += b.amountSats;
+    const key = b.title || "Anonymous";
+    owners[key] = (owners[key] || 0) + px;
+  }
+  const leaderboard = Object.entries(owners)
+    .map(([name, pixels]) => ({ name, pixels }))
+    .sort((a, b) => b.pixels - a.pixels)
+    .slice(0, 10);
+  return { totalPixels, totalSats, blockCount: blocks.length, leaderboard };
+};
+
+const pendingPixelPurchases = new Map();
+
 // ── Apps catalog (read from Supabase, fallback to JSON) ──
 const readApps = async () => {
   if (supabase) {
@@ -677,6 +751,20 @@ const getOwnApis = () => [
     costType: "variable",
     direction: "charges",
     icon: "/images/lottery.jpg",
+    verified: true,
+    featured: true,
+  },
+  {
+    id: "l402apps-million-buy",
+    provider: "L402 Apps",
+    name: "Million Sat Homepage — Buy Pixels",
+    method: "POST",
+    endpoint: `${SITE_HOST}/api/million/buy`,
+    description: "Buy pixels on the Million Sat Homepage. 1 sat per pixel, minimum 1 pixel. Proceeds donated to OpenSats. Provide x, y, width, height, and optional color/imageData/link/title.",
+    cost: 1,
+    costType: "variable",
+    direction: "charges",
+    icon: "/images/bitcoin.png",
     verified: true,
     featured: true,
   },
@@ -1159,6 +1247,30 @@ const serveLottery = async (_req, res) => {
 app.get("/lottery", serveLottery);
 app.get("/lottery.html", serveLottery);
 
+/* Serve Million Sat Homepage with injected data */
+const serveMillion = async (_req, res) => {
+  try {
+    let html = await fs.readFile(path.join(PUBLIC_DIR, "million.html"), "utf-8");
+    const blocks = await readPixelBlocks();
+    const stats = await getPixelStats();
+
+    const injection = `<script>
+      window.__PIXEL_BLOCKS__=${JSON.stringify(blocks)};
+      window.__PIXEL_STATS__=${JSON.stringify(stats)};
+      window.__L402_ENABLED__=${l402Enabled};
+    </script>`;
+
+    html = html.replace("</head>", `${injection}\n</head>`);
+    res.send(html);
+  } catch (err) {
+    console.error("Error serving million:", err.message);
+    res.status(500).send("Internal server error");
+  }
+};
+
+app.get("/million", serveMillion);
+app.get("/million.html", serveMillion);
+
 app.use(express.static(PUBLIC_DIR, { index: false }));
 
 /* ── API Routes ── */
@@ -1172,6 +1284,22 @@ app.get("/.well-known/l402.json", (_req, res) => {
     endpoints: getOwnApis().map(({ id, name, method, endpoint, description, cost, costType, direction }) => ({
       id, name, method, endpoint, description, cost, costType, direction,
     })),
+    millionSatHomepage: {
+      description: "The Million Sat Homepage — own a piece of Bitcoin internet history. 1 sat per pixel. All proceeds donated to OpenSats.",
+      gridSize: MILLION_GRID_SIZE,
+      totalPixels: MILLION_TOTAL_PIXELS,
+      costPerPixel: 1,
+      minPixels: MILLION_MIN_PIXELS,
+      maxPixels: MILLION_MAX_PIXELS,
+      pageUrl: `${SITE_HOST}/million`,
+      endpoints: {
+        grid: { method: "GET", url: `${SITE_HOST}/api/million/grid`, description: "Get all purchased pixel blocks (free)." },
+        stats: { method: "GET", url: `${SITE_HOST}/api/million/stats`, description: "Get grid stats: total pixels sold, sats raised, leaderboard (free)." },
+        check: { method: "POST", url: `${SITE_HOST}/api/million/check`, description: "Check if a region is available. Send {x, y, width, height}.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1" } },
+        buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. Send {x, y, width, height, color?, imageData?, link?, title?}. Returns 402 with invoice on first call; pay and retry with Authorization: L402 macaroon:preimage header.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageData: "base64 data URL of image (optional)", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
+      },
+      agentInstructions: "To buy pixels: 1) POST /api/million/check to verify availability, 2) POST /api/million/buy with your desired region — you'll get a 402 with an invoice, 3) Pay the Lightning invoice, 4) POST /api/million/buy again with Authorization: L402 <macaroon>:<preimage> header to confirm. Cost = width * height sats (1 sat per pixel).",
+    },
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
       method: "POST",
@@ -1970,6 +2098,156 @@ app.post("/api/lottery/enter", async (req, res) => {
     success: true,
     entry: { amountSats: entry.amountSats, paidAt: entry.paidAt },
     lottery: getSafeLotteryState(currentLottery),
+  });
+});
+
+/* ── Million Sat Homepage API Routes ── */
+
+/* GET grid state — all pixel blocks (public, free) */
+app.get("/api/million/grid", async (_req, res) => {
+  const blocks = await readPixelBlocks();
+  res.json(blocks);
+});
+
+/* GET stats — total pixels, sats, leaderboard (public, free) */
+app.get("/api/million/stats", async (_req, res) => {
+  const stats = await getPixelStats();
+  res.json(stats);
+});
+
+/* POST check region availability (free) */
+app.post("/api/million/check", async (req, res) => {
+  const { x, y, width, height } = req.body || {};
+  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(width) || !Number.isInteger(height)) {
+    return res.status(400).json({ error: "x, y, width, height must be integers." });
+  }
+  if (x < 0 || y < 0 || x + width > MILLION_GRID_SIZE || y + height > MILLION_GRID_SIZE) {
+    return res.status(400).json({ error: `Coordinates must be within 0–${MILLION_GRID_SIZE - 1}.` });
+  }
+  if (width < 1 || height < 1) {
+    return res.status(400).json({ error: "Width and height must be at least 1." });
+  }
+  const overlaps = await checkPixelOverlap(x, y, width, height);
+  res.json({ available: !overlaps, x, y, width, height, costSats: width * height });
+});
+
+/* POST buy pixels (L402-gated, variable amount) */
+app.post("/api/million/buy", async (req, res) => {
+  if (!l402Enabled) {
+    return res.status(503).json({ error: "L402 not configured" });
+  }
+
+  const { x, y, width, height, color, imageData, link, title } = req.body || {};
+
+  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(width) || !Number.isInteger(height)) {
+    return res.status(400).json({ error: "x, y, width, height must be integers." });
+  }
+  if (x < 0 || y < 0 || x + width > MILLION_GRID_SIZE || y + height > MILLION_GRID_SIZE) {
+    return res.status(400).json({ error: `Coordinates must be within 0–${MILLION_GRID_SIZE - 1}.` });
+  }
+  const totalPixels = width * height;
+  if (totalPixels < MILLION_MIN_PIXELS || totalPixels > MILLION_MAX_PIXELS) {
+    return res.status(400).json({ error: `Total pixels must be between ${MILLION_MIN_PIXELS} and ${MILLION_MAX_PIXELS.toLocaleString()}.` });
+  }
+
+  const amountSats = totalPixels;
+
+  const authHeader = req.headers["authorization"];
+  const l402 = parseL402Header(authHeader);
+
+  if (!l402) {
+    const overlaps = await checkPixelOverlap(x, y, width, height);
+    if (overlaps) {
+      return res.status(409).json({ error: "Some of those pixels are already taken. Pick a different region." });
+    }
+
+    try {
+      const { paymentHash, paymentRequest } = await createLndInvoice(
+        amountSats,
+        `Million Sat Homepage — ${totalPixels} pixel${totalPixels === 1 ? "" : "s"} at (${x},${y})`
+      );
+      const macaroon = mintL402Token(paymentHash);
+
+      pendingPixelPurchases.set(paymentHash, {
+        x, y, width, height,
+        color: color || "#ff9900",
+        imageData: imageData || null,
+        link: link || null,
+        title: title || null,
+        amountSats,
+      });
+
+      let qrDataUrl = "";
+      try {
+        qrDataUrl = await QRCode.toDataURL(paymentRequest.toUpperCase(), {
+          width: 260, margin: 2,
+          color: { dark: "#e5e9f2", light: "#0d111a" },
+        });
+      } catch (_) {}
+
+      return res
+        .status(402)
+        .set("WWW-Authenticate", `L402 macaroon="${macaroon}", invoice="${paymentRequest}"`)
+        .json({
+          error: "Payment required",
+          macaroon,
+          invoice: paymentRequest,
+          paymentHash,
+          amountSats,
+          totalPixels,
+          qrCode: qrDataUrl,
+        });
+    } catch (error) {
+      console.error("Million pixel invoice creation error:", error.message);
+      return res.status(500).json({ error: "Failed to create Lightning invoice" });
+    }
+  }
+
+  try {
+    verifyL402Token(l402.macaroon, l402.preimage);
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid L402 token: " + error.message });
+  }
+
+  const paymentHash = Buffer.from(l402.macaroon, "base64").subarray(0, 32).toString("hex");
+
+  let paidAmountSats = amountSats;
+  try {
+    const invoiceData = await lookupLndInvoice(paymentHash);
+    paidAmountSats = parseInt(invoiceData.value || invoiceData.amt_paid_sat || "0", 10);
+    if (paidAmountSats <= 0) paidAmountSats = amountSats;
+  } catch (err) {
+    console.error("Could not look up pixel invoice amount:", err.message);
+  }
+
+  pendingPixelPurchases.delete(paymentHash);
+
+  const overlaps = await checkPixelOverlap(x, y, width, height);
+  if (overlaps) {
+    return res.status(409).json({ error: "Those pixels were claimed while you were paying. Please pick a different region." });
+  }
+
+  const block = {
+    id: crypto.randomUUID(),
+    x, y, width, height,
+    color: color || "#ff9900",
+    imageData: imageData || null,
+    link: link ? normalizeUrl(link) : null,
+    title: (title || "").trim().slice(0, 100) || null,
+    paymentHash,
+    amountSats: paidAmountSats,
+    createdAt: new Date().toISOString(),
+  };
+
+  await writePixelBlock(block);
+
+  const totalPixelsFinal = width * height;
+  console.log(`🟧 Million Sat: ${totalPixelsFinal} pixel${totalPixelsFinal === 1 ? "" : "s"} bought at (${x},${y}) for ${paidAmountSats} sats — "${block.title || "Anonymous"}"`);
+
+  res.json({
+    success: true,
+    block: { id: block.id, x: block.x, y: block.y, width: block.width, height: block.height, color: block.color, title: block.title, link: block.link, amountSats: block.amountSats, createdAt: block.createdAt },
+    stats: await getPixelStats(),
   });
 });
 

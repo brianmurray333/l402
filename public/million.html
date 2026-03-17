@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Million Sat Homepage — L402 Apps</title>
+    <meta name="description" content="Own a piece of Bitcoin internet history. 1,000,000 pixels at 1 sat each. Buy as little as a single pixel via Lightning. All proceeds donated to OpenSats." />
+    <meta property="og:title" content="Million Sat Homepage — L402 Apps" />
+    <meta property="og:description" content="Own a piece of Bitcoin internet history. 1,000,000 pixels, 1 sat each. All proceeds donated to OpenSats." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.l402apps.com/million" />
+    <meta property="og:image" content="https://www.l402apps.com/images/bitcoin.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/images/bitcoin.png" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .million-main { padding: 0 64px 96px; max-width: 1100px; margin: 0 auto; }
+
+      .million-hero {
+        text-align: center;
+        padding: 48px 0 24px;
+      }
+      .million-hero h1 {
+        font-size: clamp(2rem, 5vw, 3rem);
+        margin: 0 0 8px;
+      }
+      .million-hero h1 .million-bolt { color: var(--accent); }
+      .million-subtitle { color: var(--muted); font-size: 1rem; margin: 0 0 6px; }
+      .million-opensats {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 6px 16px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 153, 0, 0.3);
+        background: rgba(255, 153, 0, 0.06);
+        color: #ff9900;
+        font-size: 0.82rem;
+        font-weight: 500;
+      }
+      .million-opensats a {
+        color: #ff9900;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      .million-stats-bar {
+        margin: 24px auto;
+        max-width: 600px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      .million-progress-wrap {
+        width: 100%;
+        height: 20px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--stroke);
+        overflow: hidden;
+        position: relative;
+      }
+      .million-progress-fill {
+        height: 100%;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #ff9900, var(--accent));
+        transition: width 0.6s ease;
+        min-width: 2px;
+      }
+      .million-progress-text {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .million-progress-text strong { color: var(--text); }
+      .million-stat-row {
+        display: flex;
+        gap: 24px;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .million-stat-row span { display: flex; align-items: center; gap: 5px; }
+
+      /* Grid canvas */
+      .million-grid-wrap {
+        position: relative;
+        margin: 20px auto;
+        max-width: 800px;
+        border-radius: 12px;
+        border: 1px solid var(--stroke);
+        overflow: hidden;
+        background: #0a0e17;
+        cursor: crosshair;
+        aspect-ratio: 1;
+      }
+      .million-canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        image-rendering: pixelated;
+      }
+      .million-selection {
+        position: absolute;
+        border: 2px solid var(--accent);
+        background: rgba(57, 240, 209, 0.12);
+        pointer-events: none;
+        display: none;
+        z-index: 2;
+        border-radius: 1px;
+      }
+      .million-tooltip {
+        position: absolute;
+        z-index: 5;
+        padding: 8px 12px;
+        border-radius: 8px;
+        background: rgba(13, 17, 26, 0.96);
+        border: 1px solid var(--stroke);
+        color: var(--text);
+        font-size: 0.78rem;
+        pointer-events: none;
+        display: none;
+        white-space: nowrap;
+        max-width: 260px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      }
+      .million-tooltip-title { font-weight: 600; margin-bottom: 2px; }
+      .million-tooltip-meta { color: var(--muted); font-size: 0.72rem; }
+
+      .million-grid-hint {
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.8rem;
+        margin: 10px 0 0;
+      }
+
+      .million-cta {
+        display: block;
+        margin: 20px auto 0;
+        padding: 14px 40px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(120deg, #ff9900, var(--accent));
+        color: #020409;
+        font-size: 1.05rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: "Space Grotesk", sans-serif;
+        transition: all 0.2s;
+        box-shadow: 0 8px 24px rgba(255, 153, 0, 0.25);
+      }
+      .million-cta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 32px rgba(255, 153, 0, 0.4);
+      }
+
+      /* How it works */
+      .million-how {
+        margin: 40px 0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+      }
+      .million-step {
+        padding: 20px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--stroke);
+        background: rgba(9, 12, 20, 0.6);
+        text-align: center;
+      }
+      .million-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        background: rgba(255, 153, 0, 0.12);
+        color: #ff9900;
+        font-weight: 700;
+        font-size: 0.85rem;
+        margin-bottom: 10px;
+      }
+      .million-step h4 { margin: 0 0 6px; font-size: 0.85rem; }
+      .million-step p { margin: 0; color: var(--muted); font-size: 0.75rem; line-height: 1.4; }
+
+      /* Leaderboard */
+      .million-section-title {
+        font-size: 1.1rem;
+        margin: 40px 0 16px;
+        color: var(--text);
+      }
+      .million-leaderboard {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .million-leader-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 10px;
+        background: rgba(9, 12, 20, 0.5);
+        border: 1px solid var(--stroke);
+        font-size: 0.85rem;
+      }
+      .leader-rank { color: #ff9900; font-weight: 700; margin-right: 10px; }
+      .leader-name { color: var(--text); }
+      .leader-pixels { color: var(--accent); font-weight: 600; }
+      .million-empty { color: var(--muted); font-size: 0.9rem; padding: 20px 0; text-align: center; }
+
+      /* Agent docs */
+      .million-agent-docs {
+        margin: 40px 0;
+        padding: 24px;
+        border-radius: 14px;
+        border: 1px solid rgba(57, 240, 209, 0.2);
+        background: rgba(57, 240, 209, 0.03);
+      }
+      .million-agent-docs h3 {
+        margin: 0 0 12px;
+        font-size: 1rem;
+        color: var(--accent);
+      }
+      .million-agent-docs p {
+        color: var(--muted);
+        font-size: 0.85rem;
+        line-height: 1.6;
+        margin: 0 0 12px;
+      }
+      .million-agent-docs pre {
+        background: rgba(5, 7, 11, 0.8);
+        border: 1px solid var(--stroke);
+        border-radius: 8px;
+        padding: 14px;
+        overflow-x: auto;
+        font-size: 0.78rem;
+        color: #93c5fd;
+        margin: 8px 0;
+        font-family: "IBM Plex Mono", monospace;
+      }
+      .million-agent-docs code {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.82rem;
+      }
+
+      /* Purchase modal */
+      .px-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      .px-modal.is-open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .px-modal-content {
+        background: rgba(13, 17, 26, 0.98);
+        border: 1px solid var(--stroke);
+        border-radius: 20px;
+        padding: 32px;
+        width: 90%;
+        max-width: 440px;
+        position: relative;
+      }
+      .px-modal-close {
+        position: absolute;
+        top: 14px; right: 18px;
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.3rem;
+        cursor: pointer;
+      }
+      .px-modal h2 { margin: 0 0 20px; font-size: 1.3rem; }
+      .px-modal h2 .px-bolt { color: #ff9900; }
+
+      .px-field { margin-bottom: 14px; }
+      .px-field label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 5px;
+        letter-spacing: 0.05em;
+      }
+      .px-field input, .px-field textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--stroke);
+        background: rgba(5, 7, 11, 0.8);
+        color: var(--text);
+        font-size: 0.9rem;
+        font-family: "Space Grotesk", sans-serif;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .px-field input:focus, .px-field textarea:focus { border-color: var(--accent); }
+
+      .px-coord-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 10px;
+      }
+
+      .px-cost-line {
+        font-size: 0.9rem;
+        color: var(--text);
+        font-weight: 600;
+        margin: 8px 0 4px;
+      }
+      .px-cost-line .px-sats { color: #ff9900; }
+
+      .px-submit-btn {
+        width: 100%;
+        padding: 12px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(120deg, #ff9900, var(--accent));
+        color: #020409;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        font-family: "Space Grotesk", sans-serif;
+        transition: all 0.2s;
+        margin-top: 10px;
+      }
+      .px-submit-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .px-color-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .px-color-swatch {
+        width: 36px; height: 36px;
+        border-radius: 8px;
+        border: 2px solid var(--stroke);
+        cursor: pointer;
+        padding: 0;
+        overflow: hidden;
+      }
+      .px-color-swatch input[type="color"] {
+        width: 50px; height: 50px;
+        margin: -7px;
+        padding: 0;
+        border: none;
+        cursor: pointer;
+      }
+
+      /* Payment step */
+      .px-payment {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        text-align: center;
+      }
+      .px-payment.is-active { display: flex; }
+      .px-qr {
+        width: 220px;
+        height: 220px;
+        border-radius: 12px;
+        background: #0d111a;
+      }
+      .px-invoice-row {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+      }
+      .px-invoice-text {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--stroke);
+        background: rgba(5, 7, 11, 0.8);
+        color: var(--muted);
+        font-size: 0.7rem;
+        font-family: "IBM Plex Mono", monospace;
+        outline: none;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .px-copy-btn {
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--stroke);
+        background: rgba(255,255,255,0.04);
+        color: var(--text);
+        font-size: 0.8rem;
+        cursor: pointer;
+        white-space: nowrap;
+        font-family: "Space Grotesk", sans-serif;
+      }
+      .px-status {
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      .px-status--success { color: var(--accent); font-weight: 600; }
+      .px-status--error { color: var(--accent-3); }
+
+      /* Confirmed step */
+      .px-confirmed { display: none; text-align: center; }
+      .px-confirmed.is-active { display: block; }
+      .px-confirmed-emoji { font-size: 3rem; margin-bottom: 12px; }
+      .px-confirmed h3 { margin: 0 0 8px; color: #ff9900; }
+      .px-confirmed p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+
+      .million-footer {
+        margin-top: 64px;
+        padding: 24px 0;
+        border-top: 1px solid var(--stroke);
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .million-footer a { color: var(--accent); text-decoration: none; }
+
+      /* Recent purchases */
+      .million-recent {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .million-recent-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        border-radius: 10px;
+        background: rgba(9, 12, 20, 0.5);
+        border: 1px solid var(--stroke);
+        font-size: 0.82rem;
+      }
+      .recent-block-info { display: flex; align-items: center; gap: 8px; }
+      .recent-color-swatch {
+        width: 14px; height: 14px;
+        border-radius: 3px;
+        border: 1px solid rgba(255,255,255,0.15);
+        flex-shrink: 0;
+      }
+      .recent-block-title { color: var(--text); }
+      .recent-block-meta { color: var(--muted); font-size: 0.75rem; }
+      .recent-block-sats { color: #ff9900; font-weight: 600; }
+
+      @media (max-width: 900px) {
+        .million-main { padding: 0 20px 48px; }
+        .million-how { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 600px) {
+        .million-main { padding: 0 16px 48px; }
+        .million-how { grid-template-columns: 1fr 1fr; gap: 10px; }
+        .million-step { padding: 14px 12px; }
+        .px-modal-content { padding: 24px 20px; }
+        .px-coord-row { grid-template-columns: 1fr 1fr; }
+        .million-stat-row { gap: 14px; font-size: 0.8rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="noise"></div>
+    <header class="site-header">
+      <div class="brand">
+        <a href="/" style="text-decoration:none"><span class="brand-mark">L402 Apps</span></a>
+      </div>
+      <nav class="site-nav">
+        <a href="/explained.html" class="nav-link-why"><img src="/images/bitcoin.png" alt="" class="nav-icon" />L402?</a>
+        <a href="/lottery" class="nav-lottery" title="Lightning Lottery">🎰 Lotto</a>
+        <a href="/million" class="nav-active" title="Million Sat Homepage">🏠 MillionSat</a>
+        <a href="/#submit" class="nav-submit"><svg class="nav-submit-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg><span class="nav-submit-plus">+</span><span class="nav-submit-label"> Submit</span></a>
+      </nav>
+    </header>
+
+    <main class="million-main">
+      <section class="million-hero">
+        <h1><span class="million-bolt">🟧</span> The Million Sat Homepage</h1>
+        <p class="million-subtitle">Own a piece of Bitcoin internet history — 1 sat per pixel</p>
+        <div class="million-opensats">
+          &#9829; All proceeds donated to <a href="https://opensats.org" target="_blank" rel="noopener">OpenSats</a>
+        </div>
+      </section>
+
+      <div class="million-stats-bar">
+        <div class="million-progress-wrap">
+          <div class="million-progress-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="million-progress-text">
+          <strong id="pixels-sold">0</strong> / 1,000,000 pixels claimed
+        </div>
+        <div class="million-stat-row">
+          <span>⚡ <strong id="sats-raised">0</strong> sats raised</span>
+          <span>🟧 <strong id="block-count">0</strong> blocks</span>
+        </div>
+      </div>
+
+      <div class="million-grid-wrap" id="grid-wrap">
+        <canvas class="million-canvas" id="grid-canvas" width="1000" height="1000"></canvas>
+        <div class="million-selection" id="selection-box"></div>
+        <div class="million-tooltip" id="tooltip">
+          <div class="million-tooltip-title" id="tooltip-title"></div>
+          <div class="million-tooltip-meta" id="tooltip-meta"></div>
+        </div>
+      </div>
+      <p class="million-grid-hint">Click and drag to select pixels, then buy them with Lightning</p>
+
+      <button class="million-cta" id="buy-pixels-btn">🟧 Buy Pixels</button>
+
+      <!-- How it works -->
+      <div class="million-how">
+        <div class="million-step">
+          <div class="million-step-num">1</div>
+          <h4>Select Pixels</h4>
+          <p>Click and drag on the grid to select a rectangle. Even a single pixel works!</p>
+        </div>
+        <div class="million-step">
+          <div class="million-step-num">2</div>
+          <h4>Customize</h4>
+          <p>Pick a color, add a link and a title. Make your mark on Bitcoin history.</p>
+        </div>
+        <div class="million-step">
+          <div class="million-step-num">3</div>
+          <h4>Pay with Lightning</h4>
+          <p>1 sat per pixel. Pay the L402 invoice — even 1 sat for a single pixel.</p>
+        </div>
+        <div class="million-step">
+          <div class="million-step-num">4</div>
+          <h4>Donate to OpenSats</h4>
+          <p>100% of proceeds go to <a href="https://opensats.org" target="_blank" rel="noopener" style="color:var(--accent)">OpenSats</a> to fund open-source Bitcoin development.</p>
+        </div>
+      </div>
+
+      <!-- Agent-compatible API docs -->
+      <div class="million-agent-docs">
+        <h3>&#129302; Agent &amp; Developer API</h3>
+        <p>This grid is fully machine-readable. Agents and scripts can buy pixels programmatically via L402.</p>
+        <pre><code># 1. Check availability
+curl -X POST https://www.l402apps.com/api/million/check \
+  -H "Content-Type: application/json" \
+  -d '{"x":100,"y":200,"width":10,"height":10}'
+
+# 2. Buy pixels (returns 402 with invoice)
+curl -X POST https://www.l402apps.com/api/million/buy \
+  -H "Content-Type: application/json" \
+  -d '{"x":100,"y":200,"width":10,"height":10,"color":"#ff9900","title":"My Block","link":"https://example.com"}'
+
+# 3. After paying invoice, retry with L402 token
+curl -X POST https://www.l402apps.com/api/million/buy \
+  -H "Content-Type: application/json" \
+  -H "Authorization: L402 &lt;macaroon&gt;:&lt;preimage&gt;" \
+  -d '{"x":100,"y":200,"width":10,"height":10,"color":"#ff9900","title":"My Block","link":"https://example.com"}'
+
+# Read grid state (free)
+curl https://www.l402apps.com/api/million/grid
+curl https://www.l402apps.com/api/million/stats</code></pre>
+        <p>Full schema at <code>/.well-known/l402.json</code> under <code>millionSatHomepage</code>.</p>
+      </div>
+
+      <!-- Leaderboard -->
+      <h3 class="million-section-title">🏆 Biggest Stackers</h3>
+      <div class="million-leaderboard" id="leaderboard">
+        <div class="million-empty">No pixels purchased yet. Be the first!</div>
+      </div>
+
+      <!-- Recent purchases -->
+      <h3 class="million-section-title">Recent Purchases</h3>
+      <div class="million-recent" id="recent-list">
+        <div class="million-empty">No purchases yet.</div>
+      </div>
+
+      <div class="million-footer">
+        <p>Powered by <a href="/">L402 Apps</a> · 100% of proceeds go to <a href="https://opensats.org" target="_blank" rel="noopener">OpenSats</a></p>
+      </div>
+    </main>
+
+    <!-- Purchase Modal -->
+    <div class="px-modal" id="px-modal" aria-hidden="true">
+      <div class="px-modal-content">
+        <button class="px-modal-close" id="px-modal-close">&#10005;</button>
+
+        <!-- Step 1: Form -->
+        <div id="px-form-step">
+          <h2><span class="px-bolt">🟧</span> Buy Pixels</h2>
+
+          <div class="px-coord-row">
+            <div class="px-field">
+              <label>X</label>
+              <input type="number" id="px-x" min="0" max="999" value="0" />
+            </div>
+            <div class="px-field">
+              <label>Y</label>
+              <input type="number" id="px-y" min="0" max="999" value="0" />
+            </div>
+            <div class="px-field">
+              <label>Width</label>
+              <input type="number" id="px-w" min="1" max="1000" value="10" />
+            </div>
+            <div class="px-field">
+              <label>Height</label>
+              <input type="number" id="px-h" min="1" max="1000" value="10" />
+            </div>
+          </div>
+
+          <div class="px-field">
+            <label>Color</label>
+            <div class="px-color-row">
+              <div class="px-color-swatch">
+                <input type="color" id="px-color" value="#ff9900" />
+              </div>
+              <input type="text" id="px-color-hex" value="#ff9900" style="flex:1" placeholder="#ff9900" />
+            </div>
+          </div>
+
+          <div class="px-field">
+            <label>Link (optional)</label>
+            <input type="url" id="px-link" placeholder="https://your-site.com" />
+          </div>
+
+          <div class="px-field">
+            <label>Title (optional)</label>
+            <input type="text" id="px-title" placeholder="Your name or message" maxlength="100" />
+          </div>
+
+          <div class="px-cost-line" id="px-cost-line">
+            Cost: <span class="px-sats" id="px-cost">100</span> sats (<span id="px-pixel-count">100</span> pixels)
+          </div>
+
+          <button class="px-submit-btn" id="px-get-invoice">Buy Pixels</button>
+          <div class="px-status" id="px-form-status" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Step 2: Payment -->
+        <div class="px-payment" id="px-payment-step">
+          <h2><span class="px-bolt">⚡</span> Pay to Claim</h2>
+          <p style="color:var(--muted);font-size:0.9rem;margin:0">Scan or copy the invoice below</p>
+          <img class="px-qr" id="px-qr" alt="Lightning Invoice QR" />
+          <div class="px-invoice-row">
+            <input class="px-invoice-text" id="px-invoice-text" readonly />
+            <button class="px-copy-btn" id="px-copy-btn">Copy</button>
+          </div>
+          <div class="px-status" id="px-payment-status">Waiting for payment...</div>
+        </div>
+
+        <!-- Step 3: Confirmation -->
+        <div class="px-confirmed" id="px-confirmed-step">
+          <div class="px-confirmed-emoji">🟧</div>
+          <h3>Pixels Claimed!</h3>
+          <p id="px-confirmed-msg">Your pixels are now live on the grid.</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="/million.js"></script>
+  </body>
+</html>
