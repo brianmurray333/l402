@@ -1351,9 +1351,9 @@ app.get("/.well-known/l402.json", (_req, res) => {
         grid: { method: "GET", url: `${SITE_HOST}/api/million/grid`, description: "Get all purchased pixel blocks (free)." },
         stats: { method: "GET", url: `${SITE_HOST}/api/million/stats`, description: "Get grid stats: total pixels sold, sats raised, leaderboard (free)." },
         check: { method: "POST", url: `${SITE_HOST}/api/million/check`, description: "Check if a region is available. Send {x, y, width, height}.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1" } },
-        buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. Send {x, y, width, height, color?, imageData?, link?, title?}. Returns 402 with invoice on first call; pay and retry with Authorization: L402 macaroon:preimage header.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageData: "base64 data URL of image (optional)", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
+        buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. Send {x, y, width, height, color?, imageData?, link?, title?}. Returns 402 with invoice on first call; pay and retry with Authorization: L402 macaroon:preimage header.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageData: "base64 data URL of image — use a rasterized format (PNG or JPEG). IMPORTANT: source image should be 3-5x the block dimensions for crisp rendering (e.g. 250x250 source for a 50x50 block). The canvas scales it down with smooth interpolation. If your encoded image is under 1KB for blocks larger than a few pixels, something is wrong — verify the image before submitting. Do NOT use SVG data URLs.", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
       },
-      agentInstructions: "To buy pixels: 1) POST /api/million/check to verify availability, 2) POST /api/million/buy with your desired region — you'll get a 402 with an invoice, 3) Pay the Lightning invoice, 4) POST /api/million/buy again with Authorization: L402 <macaroon>:<preimage> header to confirm. Cost = width * height sats (1 sat per pixel).",
+      agentInstructions: "To buy pixels: 1) POST /api/million/check to verify availability, 2) POST /api/million/buy with your desired region — you'll get a 402 with an invoice, 3) Pay the Lightning invoice, 4) POST /api/million/buy again with the SAME request body plus Authorization: L402 <macaroon>:<preimage> header to confirm. Cost = width * height sats (1 sat per pixel). IMAGE TIPS: Use a real PNG/JPEG image at 3-5x the block dimensions (e.g. 250x250 for a 50x50 block). Verify your base64 output is a valid image — if under 1KB for anything larger than a few pixels, the image is likely blank/broken.",
     },
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
@@ -2203,6 +2203,17 @@ app.post("/api/million/buy", async (req, res) => {
   const totalPixels = width * height;
   if (totalPixels < MILLION_MIN_PIXELS || totalPixels > MILLION_MAX_PIXELS) {
     return res.status(400).json({ error: `Total pixels must be between ${MILLION_MIN_PIXELS} and ${MILLION_MAX_PIXELS.toLocaleString()}.` });
+  }
+
+  if (imageData) {
+    if (typeof imageData !== "string" || !imageData.startsWith("data:image/")) {
+      return res.status(400).json({ error: "imageData must be a base64 data URL starting with 'data:image/'. Use PNG or JPEG format." });
+    }
+    const base64Part = imageData.split(",")[1] || "";
+    const byteSize = Math.ceil(base64Part.length * 3 / 4);
+    if (totalPixels > 4 && byteSize < 1024) {
+      return res.status(400).json({ error: `imageData is only ${byteSize} bytes — too small for a ${width}x${height} block. Your image is likely blank or corrupt. Use a source image at 3-5x the block dimensions (e.g. ${width * 4}x${height * 4} pixels) and verify it before submitting.` });
+    }
   }
 
   const amountSats = totalPixels;
