@@ -156,43 +156,6 @@ var buildPlaceholder = function (name) {
   return el;
 };
 
-var externalLinkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
-
-var buildHoverHeader = function (app) {
-  var header = document.createElement("div");
-  header.className = "hovercard-header";
-  var left = document.createElement("div");
-  left.className = "hovercard-header-left";
-
-  if (app.icon) {
-    var iconWrap = document.createElement("div");
-    iconWrap.className = "hover-icon";
-    var ic = document.createElement("img");
-    ic.src = app.icon;
-    ic.alt = app.name + " icon";
-    ic.loading = "lazy";
-    iconWrap.appendChild(ic);
-    left.appendChild(iconWrap);
-  }
-
-  var name = document.createElement("h4");
-  name.textContent = app.name;
-  left.appendChild(name);
-
-  var extLink = document.createElement("a");
-  extLink.className = "hovercard-ext-link";
-  extLink.href = app.url;
-  extLink.target = "_blank";
-  extLink.rel = "noreferrer";
-  extLink.setAttribute("aria-label", "Open " + app.name);
-  extLink.innerHTML = externalLinkSvg;
-  extLink.addEventListener("click", function (e) { e.stopPropagation(); });
-
-  header.appendChild(left);
-  header.appendChild(extLink);
-  return header;
-};
-
 /* -- App Detail Modal -- */
 var appDetailModal = document.querySelector("#app-detail-modal");
 var appDetailIcon = document.querySelector("#app-detail-icon");
@@ -239,8 +202,6 @@ appDetailModal.addEventListener("click", function (e) {
   appDetailMouseDownTarget = null;
 });
 
-var supportsHover = window.matchMedia("(hover: hover)").matches;
-
 var createTile = function (app) {
   var tile = document.createElement("div");
   tile.className = "app-tile" + (app.boost ? " app-tile--boosted" : "");
@@ -267,41 +228,10 @@ var createTile = function (app) {
   var nameLabel = document.createElement("div");
   nameLabel.className = "tile-name";
   nameLabel.textContent = app.name;
-
-  var hover = document.createElement("div");
-  hover.className = "hovercard";
-  var hoverDesc = document.createElement("p");
-  hoverDesc.textContent = app.description || "No description provided yet.";
-
-  var hoverActions = document.createElement("div");
-  hoverActions.className = "hovercard-actions";
-
-  var visitBtn = document.createElement("a");
-  visitBtn.className = "hovercard-visit-btn";
-  visitBtn.href = app.url;
-  visitBtn.target = "_blank";
-  visitBtn.rel = "noreferrer";
-  visitBtn.textContent = "Visit →";
-  visitBtn.addEventListener("click", function (e) { e.stopPropagation(); });
-
-  var boostBtn = document.createElement("button");
-  boostBtn.className = "hovercard-boost-btn";
-  boostBtn.textContent = "⚡ Boost";
-  boostBtn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    startBoostFlow(app.id || app.url, "app", app.name);
-  });
-
-  hoverActions.append(visitBtn, boostBtn);
-  hover.append(buildHoverHeader(app), hoverDesc, hoverActions);
-  tile.append(nameLabel, hover);
+  tile.appendChild(nameLabel);
 
   tile.addEventListener("click", function () {
-    // On touch devices (no hover), open the modal
-    if (!supportsHover) {
-      openAppDetailModal(app);
-    }
-    // On desktop, the hovercard has visit+boost, no modal needed
+    openAppDetailModal(app);
   });
 
   return tile;
