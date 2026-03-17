@@ -595,7 +595,7 @@ const getOwnApis = () => [
     name: "Submit API Endpoint",
     method: "POST",
     endpoint: `${SITE_HOST}/api/api-submissions`,
-    description: "Submit a verified L402 API endpoint and earn 10 sats.",
+    description: `Submit a verified L402 API endpoint and earn ${API_SUBMISSION_REWARD_SATS} sats. Accepts BOLT11 invoice or Lightning address for payout.`,
     cost: API_SUBMISSION_REWARD_SATS,
     costType: "fixed",
     direction: "pays",
@@ -1142,6 +1142,34 @@ app.use(express.static(PUBLIC_DIR, { index: false }));
 
 /* ── API Routes ── */
 
+/* Agent discovery — machine-readable manifest of all L402 endpoints */
+app.get("/.well-known/l402.json", (_req, res) => {
+  res.json({
+    name: "L402 Apps",
+    description: "Directory of L402-powered apps and API endpoints. Submit your L402 endpoints and earn sats.",
+    url: SITE_HOST,
+    endpoints: getOwnApis().map(({ id, name, method, endpoint, description, cost, costType, direction }) => ({
+      id, name, method, endpoint, description, cost, costType, direction,
+    })),
+    submission: {
+      endpoint: `${SITE_HOST}/api/api-submissions`,
+      method: "POST",
+      description: `Submit a verified L402 API endpoint. The site verifies your endpoint returns HTTP 402 with a valid L402 challenge, then pays you ${API_SUBMISSION_REWARD_SATS} sats.`,
+      rewardSats: API_SUBMISSION_REWARD_SATS,
+      request: {
+        url: { type: "string", required: true, description: "The L402 endpoint URL to verify and list." },
+        invoice: { type: "string", required: false, description: `A BOLT11 Lightning invoice for exactly ${API_SUBMISSION_REWARD_SATS} sats. Preferred payment method.` },
+        lightningAddress: { type: "string", required: false, description: `A Lightning address (e.g. user@wallet.com) to receive ${API_SUBMISSION_REWARD_SATS} sats. Fallback if you cannot generate an invoice.` },
+        description: { type: "string", required: false, description: "Optional human-readable description of the endpoint." },
+      },
+      notes: "Provide either 'invoice' (preferred) or 'lightningAddress' (fallback). The endpoint URL is verified server-side before listing.",
+      example: {
+        curl: `curl -X POST ${SITE_HOST}/api/api-submissions -H "Content-Type: application/json" -d '{"url":"https://api.example.com/v1/resource","lightningAddress":"you@wallet.com"}'`,
+      },
+    },
+  });
+});
+
 /* L402 Status */
 app.get("/api/l402/status", (_req, res) => {
   res.json({
@@ -1451,23 +1479,40 @@ app.get("/api/api-submissions", (_req, res) => {
           <h2>Request body</h2>
           <ul>
             <li><code>url</code> (required): the endpoint URL to verify.</li>
-            <li><code>invoice</code> (required when rewards are enabled): a 10-sat BOLT11 invoice for payout.</li>
+            <li><code>invoice</code>: a ${API_SUBMISSION_REWARD_SATS}-sat BOLT11 invoice for payout (preferred).</li>
+            <li><code>lightningAddress</code>: a Lightning address, e.g. <code>user@wallet.com</code> (fallback if you can't generate an invoice).</li>
             <li><code>description</code> (optional): your endpoint description.</li>
           </ul>
+          <p style="color:#94a3b8;font-size:0.9em;">Provide either <code>invoice</code> or <code>lightningAddress</code> to receive your ${API_SUBMISSION_REWARD_SATS} sat reward.</p>
           <pre><code>{
   "url": "https://api.example.com/v1/endpoint",
-  "invoice": "lnbc10n1...",
+  "invoice": "lnbc100n1...",
   "description": "Optional human-readable description"
+}
+
+// Or with a Lightning address:
+{
+  "url": "https://api.example.com/v1/endpoint",
+  "lightningAddress": "you@wallet.com"
 }</code></pre>
         </article>
 
         <article class="panel">
           <h2>Example cURL</h2>
-          <pre><code>curl -X POST "${SITE_HOST}/api/api-submissions" \
-  -H "Content-Type: application/json" \
+          <pre><code># With BOLT11 invoice (default):
+curl -X POST "${SITE_HOST}/api/api-submissions" \\
+  -H "Content-Type: application/json" \\
   -d '{
     "url": "https://api.example.com/v1/endpoint",
-    "invoice": "lnbc10n1..."
+    "invoice": "lnbc100n1..."
+  }'
+
+# With Lightning address (fallback):
+curl -X POST "${SITE_HOST}/api/api-submissions" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "url": "https://api.example.com/v1/endpoint",
+    "lightningAddress": "you@wallet.com"
   }'</code></pre>
           <p class="status">${rewardCopy}</p>
         </article>
@@ -1482,9 +1527,9 @@ app.get("/api/api-submissions", (_req, res) => {
 </html>`);
 });
 
-/* Submit API Endpoint (site pays user 10 sats) */
+/* Submit API Endpoint (site pays user sats) */
 app.post("/api/api-submissions", async (req, res) => {
-  const { url, invoice, description: userDesc } = req.body || {};
+  const { url, invoice, lightningAddress, description: userDesc } = req.body || {};
   const rawUrl = normalizeUrl(url);
 
   if (!rawUrl) {
@@ -1543,42 +1588,55 @@ app.post("/api/api-submissions", async (req, res) => {
     icon = `${parsed.origin}/favicon.ico`;
   } catch (_) {}
 
-  // If L402 enabled, verify and pay the submitter's invoice
+  // If L402 enabled, pay the submitter via BOLT11 invoice (default) or Lightning address (fallback)
   if (l402Enabled) {
-    if (!invoice || !invoice.trim()) {
+    const hasInvoice = invoice && invoice.trim();
+    const hasLightningAddress = lightningAddress && lightningAddress.includes("@");
+
+    if (!hasInvoice && !hasLightningAddress) {
       return res.status(400).json({
-        error: "A Lightning invoice for 10 sats is required to receive your reward.",
+        error: `Provide a BOLT11 invoice for ${API_SUBMISSION_REWARD_SATS} sats, or a Lightning address (e.g. user@wallet.com) to receive your reward.`,
       });
     }
 
-    // Decode the user's invoice to verify amount
-    let userInvoiceDecoded;
-    try {
-      userInvoiceDecoded = await decodeInvoice(invoice.trim());
-    } catch (err) {
-      return res.status(400).json({
-        error: "Could not decode your Lightning invoice. Please provide a valid bolt11 invoice.",
-      });
+    if (hasInvoice) {
+      let userInvoiceDecoded;
+      try {
+        userInvoiceDecoded = await decodeInvoice(invoice.trim());
+      } catch (err) {
+        return res.status(400).json({
+          error: "Could not decode your Lightning invoice. Please provide a valid bolt11 invoice.",
+        });
+      }
+
+      const invoiceSats = parseInt(userInvoiceDecoded.num_satoshis || "0", 10);
+      if (invoiceSats !== API_SUBMISSION_REWARD_SATS) {
+        return res.status(400).json({
+          error: `Invoice must be for exactly ${API_SUBMISSION_REWARD_SATS} sats (got ${invoiceSats} sats).`,
+        });
+      }
+
+      try {
+        await payInvoice(invoice.trim());
+      } catch (err) {
+        console.error("Payment to submitter failed:", err.message);
+        return res.status(502).json({
+          error: "Payment failed. Please check your invoice and try again. " + err.message,
+        });
+      }
+    } else {
+      // Lightning address fallback for callers without a wallet
+      try {
+        await payToLightningAddress(lightningAddress, API_SUBMISSION_REWARD_SATS);
+        console.log(`Paid ${API_SUBMISSION_REWARD_SATS} sats to ${lightningAddress} for API submission`);
+      } catch (err) {
+        console.error("Lightning address payment failed:", err.message);
+        return res.status(502).json({
+          error: `Could not pay Lightning address "${lightningAddress}": ${err.message}`,
+        });
+      }
     }
 
-    const invoiceSats = parseInt(userInvoiceDecoded.num_satoshis || "0", 10);
-    if (invoiceSats !== API_SUBMISSION_REWARD_SATS) {
-      return res.status(400).json({
-        error: `Invoice must be for exactly ${API_SUBMISSION_REWARD_SATS} sats (got ${invoiceSats} sats).`,
-      });
-    }
-
-    // Pay the invoice
-    try {
-      await payInvoice(invoice.trim());
-    } catch (err) {
-      console.error("Payment to submitter failed:", err.message);
-      return res.status(502).json({
-        error: "Payment failed. Please check your invoice and try again. " + err.message,
-      });
-    }
-
-    // Check balance after payment
     checkAndNotifyLowBalance().catch(() => {});
   }
 

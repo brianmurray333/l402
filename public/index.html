@@ -211,10 +211,10 @@
           </div>
           <form id="api-confirm-form">
             <div class="field full">
-              <label for="api-invoice">Your Lightning Invoice (10 sats)</label>
-              <input id="api-invoice" type="text" placeholder="lnbc100n1p..." required />
+              <label for="api-invoice">Lightning Invoice or Address</label>
+              <input id="api-invoice" type="text" placeholder="lnbc... or you@wallet.com" required />
               <p class="form-note">
-                Create a <strong>10 sat</strong> invoice in your Lightning wallet and paste it here to receive your reward.
+                Paste a BOLT11 invoice for the reward amount, or a Lightning address (e.g. <strong>you@wallet.com</strong>).
               </p>
             </div>
             <div class="field full">
@@ -223,7 +223,7 @@
             </div>
             <div class="modal-actions">
               <button type="button" class="ghost" data-api-modal-close>Cancel</button>
-              <button type="submit" class="primary" id="api-save-btn">Submit &amp; Earn 10 sats</button>
+              <button type="submit" class="primary" id="api-save-btn">Submit &amp; Earn 100 sats</button>
             </div>
             <p class="form-note" data-api-confirm-status></p>
           </form>

@@ -888,15 +888,23 @@ apiConfirmForm.addEventListener("submit", async function (event) {
   event.preventDefault();
   if (!pendingApiVerification) return;
 
-  var invoice = apiInvoiceInput.value.trim();
+  var paymentInput = apiInvoiceInput.value.trim();
   var description = apiEditDescription.value.trim();
 
-  if (!invoice) {
+  if (!paymentInput) {
     if (apiConfirmStatus) {
-      apiConfirmStatus.textContent = "Please paste a 10 sat Lightning invoice.";
+      apiConfirmStatus.textContent = "Please paste a Lightning invoice or address.";
       apiConfirmStatus.style.color = "#f8b4ff";
     }
     return;
+  }
+
+  var isLightningAddress = paymentInput.includes("@") && !paymentInput.startsWith("lnbc");
+  var payload = { url: pendingApiVerification.endpoint, description: description };
+  if (isLightningAddress) {
+    payload.lightningAddress = paymentInput;
+  } else {
+    payload.invoice = paymentInput;
   }
 
   apiSaveBtn.disabled = true;
@@ -910,11 +918,7 @@ apiConfirmForm.addEventListener("submit", async function (event) {
     var response = await fetch("/api/api-submissions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: pendingApiVerification.endpoint,
-        invoice: invoice,
-        description: description,
-      }),
+      body: JSON.stringify(payload),
     });
     var data = await response.json();
     if (!response.ok) throw new Error(data.error || "Submission failed.");
@@ -923,7 +927,7 @@ apiConfirmForm.addEventListener("submit", async function (event) {
     renderApis(apisData);
     closeApiModal();
     apiSubmissionForm.reset();
-    alert("API submitted! 10 sats have been sent to your invoice.");
+    alert("API submitted! Your sats reward has been sent.");
   } catch (error) {
     if (apiConfirmStatus) {
       apiConfirmStatus.textContent = error.message;
@@ -931,19 +935,23 @@ apiConfirmForm.addEventListener("submit", async function (event) {
     }
   } finally {
     apiSaveBtn.disabled = false;
-    apiSaveBtn.textContent = "Submit & Earn 10 sats";
+    apiSaveBtn.textContent = "Submit & Earn " + apiRewardSats + " sats";
   }
 });
 
 /* -- L402 Status (for paywall note) -- */
+var apiRewardSats = 100;
+
 var checkL402Status = async function () {
   try {
     var res = await fetch("/api/l402/status");
     var data = await res.json();
     l402Enabled = data.enabled;
+    if (data.apiSubmissionRewardSats) apiRewardSats = data.apiSubmissionRewardSats;
     if (l402Enabled && paywallNote) {
       paywallNote.textContent = " Submission costs " + data.appSubmissionCostSats + " sats via Lightning.";
     }
+    if (apiSaveBtn) apiSaveBtn.textContent = "Submit & Earn " + apiRewardSats + " sats";
   } catch (_err) {}
 };
 
