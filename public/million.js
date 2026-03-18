@@ -75,6 +75,38 @@
     return Number(n || 0).toLocaleString();
   }
 
+  // ── New-block animation ──
+  function animateNewBlock(block) {
+    var wrapRect = gridWrap.getBoundingClientRect();
+    var sx = wrapRect.width / GRID;
+    var sy = wrapRect.height / GRID;
+
+    var left = block.x * sx;
+    var top = block.y * sy;
+    var w = block.width * sx;
+    var h = block.height * sy;
+
+    var glow = document.createElement("div");
+    glow.className = "million-block-glow";
+    glow.style.left = left + "px";
+    glow.style.top = top + "px";
+    glow.style.width = w + "px";
+    glow.style.height = h + "px";
+
+    var ring = document.createElement("div");
+    ring.className = "million-block-ring";
+    ring.style.left = left + "px";
+    ring.style.top = top + "px";
+    ring.style.width = w + "px";
+    ring.style.height = h + "px";
+
+    gridWrap.appendChild(glow);
+    gridWrap.appendChild(ring);
+
+    glow.addEventListener("animationend", function () { glow.remove(); });
+    ring.addEventListener("animationend", function () { ring.remove(); });
+  }
+
   // ── Render grid on canvas ──
   function drawGrid() {
     ctx.fillStyle = "#0a0e17";
@@ -457,6 +489,7 @@
                   blocks.push(result.block);
                   stats = result.stats;
                   drawGrid();
+                  animateNewBlock(result.block);
                   renderStats();
                   renderLeaderboard();
                   renderRecent();
@@ -485,8 +518,12 @@
       .then(function (r) { return r.json(); })
       .then(function (data) {
         if (data.length !== blocks.length) {
+          var newBlocks = data.slice(blocks.length);
           blocks = data;
           drawGrid();
+          for (var i = 0; i < newBlocks.length; i++) {
+            animateNewBlock(newBlocks[i]);
+          }
           renderRecent();
         }
       })
