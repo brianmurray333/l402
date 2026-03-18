@@ -104,6 +104,34 @@
         box-shadow: 0 6px 20px rgba(255, 153, 0, 0.4);
       }
 
+      /* Image upload */
+      .px-image-upload { display: flex; flex-direction: column; gap: 6px; }
+      .px-image-drop {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 64px; border: 2px dashed var(--stroke); border-radius: 8px;
+        cursor: pointer; transition: border-color 0.2s, background 0.2s;
+        padding: 12px; text-align: center; position: relative;
+      }
+      .px-image-drop:hover, .px-image-drop.dragover {
+        border-color: var(--accent); background: rgba(57, 240, 209, 0.04);
+      }
+      .px-image-drop-text { color: var(--muted); font-size: 0.82rem; }
+      .px-image-preview {
+        max-height: 80px; max-width: 100%; border-radius: 4px;
+        object-fit: contain;
+        background: repeating-conic-gradient(#1a1f2e 0% 25%, #0d111a 0% 50%) 50% / 12px 12px;
+      }
+      .px-image-meta {
+        display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted);
+      }
+      .px-image-clear {
+        background: none; border: 1px solid var(--stroke); border-radius: 4px;
+        color: var(--muted); cursor: pointer; font-size: 0.72rem; padding: 2px 8px;
+      }
+      .px-image-clear:hover { color: #ff4444; border-color: #ff4444; }
+      .px-image-or { color: var(--muted); font-size: 0.75rem; text-align: center; }
+      .px-image-hint { color: var(--muted); font-size: 0.7rem; margin-top: 2px; }
+
       /* Grid canvas */
       .million-grid-wrap {
         position: relative;
@@ -551,27 +579,30 @@
       <!-- Agent-compatible API docs -->
       <div class="million-agent-docs">
         <h3>&#129302; Agent &amp; Developer API</h3>
-        <p>This grid is fully machine-readable. Agents and scripts can buy pixels programmatically via L402.</p>
-        <pre><code># 1. Check availability
-curl -X POST https://www.l402apps.com/api/million/check \
-  -H "Content-Type: application/json" \
-  -d '{"x":100,"y":200,"width":10,"height":10}'
-
-# 2. Buy pixels (returns 402 with invoice)
+        <p>This grid is fully machine-readable. Agents and scripts can buy pixels programmatically via L402. Coordinates (x, y) are optional — omit them and the server auto-places your block.</p>
+        <pre><code># 1. Buy pixels (returns 402 with Lightning invoice)
+#    Use imageUrl to include your logo (server fetches it directly)
+#    x and y are optional — omit for auto-placement
 curl -X POST https://www.l402apps.com/api/million/buy \
   -H "Content-Type: application/json" \
-  -d '{"x":100,"y":200,"width":10,"height":10,"color":"#ff9900","title":"My Block","link":"https://example.com"}'
+  -d '{"width":50,"height":50,"imageUrl":"https://example.com/logo.png","title":"My Brand","link":"https://example.com"}'
 
-# 3. After paying invoice, retry with L402 token
+# 2. Show the invoice to the user. Once they pay, the server
+#    auto-detects payment and completes the purchase within seconds.
+#    Poll the status endpoint to confirm:
+curl https://www.l402apps.com/api/million/buy/status/{paymentHash}
+# Returns {"paid":false} while unpaid, then {"paid":true,"success":true,"block":{...}} once settled.
+
+# Alternative: if you have the preimage, complete immediately:
 curl -X POST https://www.l402apps.com/api/million/buy \
   -H "Content-Type: application/json" \
   -H "Authorization: L402 &lt;macaroon&gt;:&lt;preimage&gt;" \
-  -d '{"x":100,"y":200,"width":10,"height":10,"color":"#ff9900","title":"My Block","link":"https://example.com"}'
+  -d '{"width":50,"height":50,"imageUrl":"https://example.com/logo.png","title":"My Brand","link":"https://example.com"}'
 
 # Read grid state (free)
 curl https://www.l402apps.com/api/million/grid
 curl https://www.l402apps.com/api/million/stats</code></pre>
-        <p>Full schema at <code>/.well-known/l402.json</code> under <code>millionSatHomepage</code>.</p>
+        <p>Pricing: 1 sat per pixel. Overlapping existing blocks costs 5x per overlapping pixel. Full schema at <code>/.well-known/l402.json</code> under <code>millionSatHomepage</code>.</p>
       </div>
 
       <!-- Leaderboard -->
@@ -627,6 +658,24 @@ curl https://www.l402apps.com/api/million/stats</code></pre>
               </div>
               <input type="text" id="px-color-hex" value="#ff9900" style="flex:1" placeholder="#ff9900" />
             </div>
+          </div>
+
+          <div class="px-field">
+            <label>Image (optional)</label>
+            <div class="px-image-upload">
+              <label class="px-image-drop" id="px-image-drop">
+                <input type="file" id="px-image-file" accept="image/png,image/jpeg,image/webp" style="display:none" />
+                <span class="px-image-drop-text" id="px-image-drop-text">Drop an image or click to upload</span>
+                <img class="px-image-preview" id="px-image-preview" style="display:none" alt="Preview" />
+              </label>
+              <div class="px-image-meta" id="px-image-meta" style="display:none">
+                <span id="px-image-name"></span>
+                <button type="button" class="px-image-clear" id="px-image-clear">&times; Remove</button>
+              </div>
+              <div class="px-image-or">or paste a URL:</div>
+              <input type="url" id="px-image-url" placeholder="https://example.com/logo.png" />
+            </div>
+            <div class="px-image-hint">PNG recommended for transparency. Max 2 MB.</div>
           </div>
 
           <div class="px-field">
