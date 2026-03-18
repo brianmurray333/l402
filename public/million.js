@@ -75,36 +75,56 @@
     return Number(n || 0).toLocaleString();
   }
 
-  // ── New-block animation ──
+  // ── New-block confetti animation ──
+  var btcShape = typeof confetti !== "undefined" && confetti.shapeFromText
+    ? confetti.shapeFromText({ text: "₿", scalar: 2 })
+    : null;
+
   function animateNewBlock(block) {
+    if (typeof confetti === "undefined") return;
+
     var wrapRect = gridWrap.getBoundingClientRect();
     var sx = wrapRect.width / GRID;
     var sy = wrapRect.height / GRID;
 
-    var left = block.x * sx;
-    var top = block.y * sy;
-    var w = block.width * sx;
-    var h = block.height * sy;
+    var centerX = (wrapRect.left + block.x * sx + (block.width * sx) / 2) / window.innerWidth;
+    var centerY = (wrapRect.top + block.y * sy + (block.height * sy) / 2) / window.innerHeight;
 
-    var glow = document.createElement("div");
-    glow.className = "million-block-glow";
-    glow.style.left = left + "px";
-    glow.style.top = top + "px";
-    glow.style.width = w + "px";
-    glow.style.height = h + "px";
+    var shapes = btcShape ? [btcShape] : ["circle"];
+    var colors = ["#ff9900", "#f7931a", "#ffb84d", "#e8860c", "#ffd700"];
 
-    var ring = document.createElement("div");
-    ring.className = "million-block-ring";
-    ring.style.left = left + "px";
-    ring.style.top = top + "px";
-    ring.style.width = w + "px";
-    ring.style.height = h + "px";
+    var shoot = function () {
+      confetti({
+        particleCount: 35,
+        spread: 360,
+        ticks: 80,
+        gravity: 0.6,
+        decay: 0.94,
+        startVelocity: 25,
+        origin: { x: centerX, y: centerY },
+        shapes: shapes,
+        scalar: 2,
+        colors: colors,
+        zIndex: 200,
+      });
+      confetti({
+        particleCount: 15,
+        spread: 360,
+        ticks: 60,
+        gravity: 0,
+        decay: 0.95,
+        startVelocity: 15,
+        origin: { x: centerX, y: centerY },
+        shapes: ["circle"],
+        scalar: 0.8,
+        colors: colors,
+        zIndex: 200,
+      });
+    };
 
-    gridWrap.appendChild(glow);
-    gridWrap.appendChild(ring);
-
-    glow.addEventListener("animationend", function () { glow.remove(); });
-    ring.addEventListener("animationend", function () { ring.remove(); });
+    shoot();
+    setTimeout(shoot, 150);
+    setTimeout(shoot, 300);
   }
 
   // ── Render grid on canvas ──
