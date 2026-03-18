@@ -243,8 +243,10 @@
         tooltip.style.display = "block";
         tooltip.style.left = tipX + "px";
         tooltip.style.top = tipY + "px";
+        gridWrap.style.cursor = block.link ? "pointer" : "crosshair";
       } else {
         tooltip.style.display = "none";
+        gridWrap.style.cursor = "crosshair";
       }
     }
   });

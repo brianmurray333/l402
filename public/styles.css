@@ -243,7 +243,6 @@ h2 {
   display: block;
   position: relative;
   border-radius: 10px;
-  cursor: pointer;
   border: 1px solid var(--stroke);
   background: rgba(8, 10, 16, 0.8);
   overflow: hidden;
