@@ -2220,7 +2220,7 @@ app.post("/api/lottery/enter", async (req, res) => {
 
 /* GET grid state — all pixel blocks (public, free) */
 app.get("/api/million/grid", async (_req, res) => {
-  autoSettlePendingPurchases();
+  await autoSettlePendingPurchases();
   const blocks = await readPixelBlocks();
   res.json(blocks);
 });
@@ -2534,8 +2534,6 @@ const autoSettlePendingPurchases = async () => {
         if (looked > 0) paidAmountSats = looked;
       } catch (_) {}
 
-      await deletePendingPixelPurchase(purchase.paymentHash);
-
       const block = {
         id: crypto.randomUUID(),
         x: purchase.x, y: purchase.y, width: purchase.width, height: purchase.height,
@@ -2549,6 +2547,7 @@ const autoSettlePendingPurchases = async () => {
       };
 
       await writePixelBlock(block);
+      await deletePendingPixelPurchase(purchase.paymentHash);
       const px = block.width * block.height;
       console.log(`🟧 Million Sat (auto-settle): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
     }
