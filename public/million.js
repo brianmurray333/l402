@@ -76,9 +76,12 @@
   }
 
   // ── New-block confetti animation ──
-  var btcShape = typeof confetti !== "undefined" && confetti.shapeFromText
-    ? confetti.shapeFromText({ text: "₿", scalar: 3 })
-    : null;
+  var btcShape = null;
+  if (typeof confetti !== "undefined" && confetti.shapeFromPath) {
+    btcShape = confetti.shapeFromPath({
+      path: "M12.5 2V4.5M12.5 20V22.5M7.5 4.5H15C17.0711 4.5 18.75 6.17893 18.75 8.25C18.75 10.3211 17.0711 12 15 12H7.5V4.5ZM7.5 12H16.25C18.3211 12 20 13.6789 20 15.75C20 17.8211 18.3211 19.5 16.25 19.5H7.5V12Z",
+    });
+  }
 
   function animateNewBlock(block) {
     if (typeof confetti === "undefined") return;
