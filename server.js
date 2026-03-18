@@ -2220,8 +2220,17 @@ app.post("/api/lottery/enter", async (req, res) => {
 
 /* GET grid state — all pixel blocks (public, free) */
 app.get("/api/million/grid", async (_req, res) => {
-  await autoSettlePendingPurchases();
-  const blocks = await readPixelBlocks();
+  const [blocks, pending] = await Promise.all([
+    readPixelBlocks(),
+    l402Enabled ? loadAllPendingPixelPurchases() : Promise.resolve([]),
+  ]);
+
+  if (pending.length > 0) {
+    await Promise.allSettled(pending.map(p => settleOnePending(p, blocks)));
+    const freshBlocks = await readPixelBlocks();
+    return res.json(freshBlocks);
+  }
+
   res.json(blocks);
 });
 
@@ -2505,59 +2514,32 @@ app.get("*", (req, res) => {
   });
 });
 
-/* ── Background: auto-settle pending pixel purchases ── */
-let autoSettleRunning = false;
-const autoSettlePendingPurchases = async () => {
-  if (autoSettleRunning || !l402Enabled) return;
-  autoSettleRunning = true;
-  try {
-    const pending = await loadAllPendingPixelPurchases();
-    if (pending.length === 0) return;
-
-    const existingBlocks = await readPixelBlocks();
-    for (const purchase of pending) {
-      const already = existingBlocks.find(b => b.paymentHash === purchase.paymentHash);
-      if (already) {
-        await deletePendingPixelPurchase(purchase.paymentHash);
-        continue;
-      }
-
-      try {
-        const { paid } = await checkInvoicePaid(purchase.paymentHash);
-        if (!paid) continue;
-      } catch (_) { continue; }
-
-      let paidAmountSats = purchase.amountSats;
-      try {
-        const inv = await lookupLndInvoice(purchase.paymentHash);
-        const looked = parseInt(inv.value || inv.amt_paid_sat || "0", 10);
-        if (looked > 0) paidAmountSats = looked;
-      } catch (_) {}
-
-      const block = {
-        id: crypto.randomUUID(),
-        x: purchase.x, y: purchase.y, width: purchase.width, height: purchase.height,
-        color: purchase.color || "#ff9900",
-        imageData: purchase.imageData || null,
-        link: purchase.link || null,
-        title: (purchase.title || "").trim().slice(0, 100) || null,
-        paymentHash: purchase.paymentHash,
-        amountSats: paidAmountSats,
-        createdAt: new Date().toISOString(),
-      };
-
-      await writePixelBlock(block);
-      await deletePendingPixelPurchase(purchase.paymentHash);
-      const px = block.width * block.height;
-      console.log(`🟧 Million Sat (auto-settle): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
-    }
-  } catch (err) {
-    console.error("Auto-settle error:", err.message);
-  } finally {
-    autoSettleRunning = false;
+/* ── Auto-settle: complete pending pixel purchases whose invoices are paid ── */
+const settleOnePending = async (purchase, existingBlocks) => {
+  if (existingBlocks.find(b => b.paymentHash === purchase.paymentHash)) {
+    await deletePendingPixelPurchase(purchase.paymentHash);
+    return;
   }
+  const { paid } = await checkInvoicePaid(purchase.paymentHash);
+  if (!paid) return;
+
+  const block = {
+    id: crypto.randomUUID(),
+    x: purchase.x, y: purchase.y, width: purchase.width, height: purchase.height,
+    color: purchase.color || "#ff9900",
+    imageData: purchase.imageData || null,
+    link: purchase.link || null,
+    title: (purchase.title || "").trim().slice(0, 100) || null,
+    paymentHash: purchase.paymentHash,
+    amountSats: purchase.amountSats,
+    createdAt: new Date().toISOString(),
+  };
+  await writePixelBlock(block);
+  await deletePendingPixelPurchase(purchase.paymentHash);
+  const px = block.width * block.height;
+  console.log(`🟧 Million Sat (auto-settle): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
 };
-setInterval(autoSettlePendingPurchases, 2000);
+
 
 app.listen(PORT, () => {
   console.log(`L402 marketplace running on http://localhost:${PORT}`);
