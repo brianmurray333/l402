@@ -1398,8 +1398,9 @@ app.get("/.well-known/l402.json", (_req, res) => {
         stats: { method: "GET", url: `${SITE_HOST}/api/million/stats`, description: "Get grid stats: total pixels sold, sats raised, leaderboard (free)." },
         check: { method: "POST", url: `${SITE_HOST}/api/million/check`, description: "Check region availability and cost. x and y are optional — omit them for auto-placement. Returns overlapPixels count and total costSats.", body: { x: "integer 0-999 (optional — omit for auto-placement)", y: "integer 0-999 (optional — omit for auto-placement)", width: "integer >=1", height: "integer >=1" } },
         buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. x and y are optional — omit for auto-placement. Use imageUrl instead of imageData to let the server fetch your logo directly (avoids payload limits, better quality). Overlapping existing pixels costs 5x per overlapping pixel.", body: { x: "integer 0-999 (optional — omit for auto-placement)", y: "integer 0-999 (optional — omit for auto-placement)", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageUrl: "URL to a PNG/JPEG/WebP image (recommended — server fetches and stores it, max 2MB). Preferred over imageData.", imageData: "base64 data URL of image (alternative to imageUrl). Use 3-5x block dimensions for crisp rendering.", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
+        status: { method: "GET", url: `${SITE_HOST}/api/million/buy/status/{paymentHash}`, description: "Poll for payment status. Returns {paid: false} if unpaid. Once the invoice is paid, auto-completes the purchase and returns {paid: true, success: true, block, stats}. Idempotent — safe to call repeatedly. Use the paymentHash from the 402 response." },
       },
-      agentInstructions: `To buy pixels: 1) POST /api/million/buy with {width, height} (x/y optional — omit for auto-placement) — you'll get a 402 with an invoice, coordinates, and cost breakdown. 2) Pay the Lightning invoice. 3) POST /api/million/buy again with the SAME body plus Authorization: L402 <macaroon>:<preimage> header. PRICING: 1 sat per free pixel. Overlapping existing blocks costs ${MILLION_OVERLAP_MULTIPLIER}x per overlapping pixel. The 402 response includes overlapPixels and the final amountSats. IMAGES: Prefer imageUrl over imageData — just pass a URL to a PNG/JPEG/WebP and the server fetches it directly. This avoids base64 encoding and payload size limits.`,
+      agentInstructions: `To buy pixels: 1) POST /api/million/buy with {width, height} (x/y optional — omit for auto-placement) — you'll get a 402 with an invoice, paymentHash, coordinates, and cost breakdown. 2) Show the invoice to the user to pay. 3) RECOMMENDED: Poll GET /api/million/buy/status/{paymentHash} every 2-3 seconds. Once the user pays, it returns {paid: true, success: true, block, stats} and the purchase is complete — no preimage needed. ALTERNATIVE: If you have the preimage, POST /api/million/buy again with the SAME body plus Authorization: L402 <macaroon>:<preimage> header. PRICING: 1 sat per free pixel. Overlapping existing blocks costs ${MILLION_OVERLAP_MULTIPLIER}x per overlapping pixel. The 402 response includes overlapPixels and the final amountSats. IMAGES: Prefer imageUrl over imageData — just pass a URL to a PNG/JPEG/WebP and the server fetches it directly. This avoids base64 encoding and payload size limits.`,
     },
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
@@ -2411,6 +2412,71 @@ app.post("/api/million/buy", async (req, res) => {
 
   res.json({
     success: true,
+    block: { id: block.id, x: block.x, y: block.y, width: block.width, height: block.height, color: block.color, title: block.title, link: block.link, amountSats: block.amountSats, createdAt: block.createdAt },
+    stats: await getPixelStats(),
+  });
+});
+
+/* GET poll for pixel purchase payment status — auto-completes on payment */
+app.get("/api/million/buy/status/:paymentHash", async (req, res) => {
+  const { paymentHash } = req.params;
+  if (!paymentHash || !/^[a-f0-9]{64}$/i.test(paymentHash)) {
+    return res.status(400).json({ error: "Invalid paymentHash" });
+  }
+
+  const existingBlocks = await readPixelBlocks();
+  const existing = existingBlocks.find(b => b.paymentHash === paymentHash);
+  if (existing) {
+    return res.json({
+      paid: true,
+      success: true,
+      block: { id: existing.id, x: existing.x, y: existing.y, width: existing.width, height: existing.height, color: existing.color, title: existing.title, link: existing.link, amountSats: existing.amountSats, createdAt: existing.createdAt },
+      stats: await getPixelStats(),
+    });
+  }
+
+  try {
+    const { paid } = await checkInvoicePaid(paymentHash);
+    if (!paid) {
+      return res.json({ paid: false });
+    }
+  } catch (err) {
+    return res.status(404).json({ error: "Invoice not found" });
+  }
+
+  const purchaseData = await loadPendingPixelPurchase(paymentHash);
+  if (!purchaseData) {
+    return res.status(404).json({ error: "No pending purchase found for this payment hash" });
+  }
+
+  let paidAmountSats = purchaseData.amountSats;
+  try {
+    const invoiceData = await lookupLndInvoice(paymentHash);
+    const looked = parseInt(invoiceData.value || invoiceData.amt_paid_sat || "0", 10);
+    if (looked > 0) paidAmountSats = looked;
+  } catch (_) {}
+
+  await deletePendingPixelPurchase(paymentHash);
+
+  const block = {
+    id: crypto.randomUUID(),
+    x: purchaseData.x, y: purchaseData.y, width: purchaseData.width, height: purchaseData.height,
+    color: purchaseData.color || "#ff9900",
+    imageData: purchaseData.imageData || null,
+    link: purchaseData.link || null,
+    title: (purchaseData.title || "").trim().slice(0, 100) || null,
+    paymentHash,
+    amountSats: paidAmountSats,
+    createdAt: new Date().toISOString(),
+  };
+
+  await writePixelBlock(block);
+  const px = block.width * block.height;
+  console.log(`🟧 Million Sat: ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}" (via polling)`);
+
+  res.json({
+    success: true,
+    paid: true,
     block: { id: block.id, x: block.x, y: block.y, width: block.width, height: block.height, color: block.color, title: block.title, link: block.link, amountSats: block.amountSats, createdAt: block.createdAt },
     stats: await getPixelStats(),
   });
