@@ -77,7 +77,7 @@
 
   // ── New-block confetti animation ──
   var btcShape = typeof confetti !== "undefined" && confetti.shapeFromText
-    ? confetti.shapeFromText({ text: "₿", scalar: 2 })
+    ? confetti.shapeFromText({ text: "₿", scalar: 3 })
     : null;
 
   function animateNewBlock(block) {
@@ -95,28 +95,28 @@
 
     var shoot = function () {
       confetti({
-        particleCount: 35,
-        spread: 360,
+        particleCount: 30,
+        spread: 120,
         ticks: 80,
         gravity: 0.6,
         decay: 0.94,
-        startVelocity: 25,
+        startVelocity: 20,
         origin: { x: centerX, y: centerY },
         shapes: shapes,
-        scalar: 2,
+        scalar: 3,
         colors: colors,
         zIndex: 200,
       });
       confetti({
-        particleCount: 15,
-        spread: 360,
+        particleCount: 10,
+        spread: 90,
         ticks: 60,
         gravity: 0,
         decay: 0.95,
-        startVelocity: 15,
+        startVelocity: 12,
         origin: { x: centerX, y: centerY },
         shapes: ["circle"],
-        scalar: 0.8,
+        scalar: 1,
         colors: colors,
         zIndex: 200,
       });
