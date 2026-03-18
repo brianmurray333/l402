@@ -76,11 +76,9 @@
   }
 
   // ── New-block confetti animation ──
-  var btcShape = null;
-  if (typeof confetti !== "undefined" && confetti.shapeFromPath) {
-    btcShape = confetti.shapeFromPath({
-      path: "M12.5 2V4.5M12.5 20V22.5M7.5 4.5H15C17.0711 4.5 18.75 6.17893 18.75 8.25C18.75 10.3211 17.0711 12 15 12H7.5V4.5ZM7.5 12H16.25C18.3211 12 20 13.6789 20 15.75C20 17.8211 18.3211 19.5 16.25 19.5H7.5V12Z",
-    });
+  var coinShape = null;
+  if (typeof confetti !== "undefined" && confetti.shapeFromText) {
+    coinShape = confetti.shapeFromText({ text: "🪙", scalar: 3 });
   }
 
   function animateNewBlock(block) {
@@ -93,30 +91,44 @@
     var centerX = (wrapRect.left + block.x * sx + (block.width * sx) / 2) / window.innerWidth;
     var centerY = (wrapRect.top + block.y * sy + (block.height * sy) / 2) / window.innerHeight;
 
-    var shapes = btcShape ? [btcShape] : ["circle"];
-    var colors = ["#ff9900", "#f7931a", "#ffb84d", "#e8860c", "#ffd700"];
+    var colors = ["#ff9900", "#f7931a", "#ffb84d", "#ffd700", "#e8860c"];
 
     var shoot = function () {
+      if (coinShape) {
+        confetti({
+          particleCount: 20,
+          spread: 100,
+          ticks: 90,
+          gravity: 0.7,
+          decay: 0.93,
+          startVelocity: 22,
+          origin: { x: centerX, y: centerY },
+          shapes: [coinShape],
+          scalar: 3,
+          zIndex: 200,
+          flat: true,
+        });
+      }
       confetti({
-        particleCount: 30,
-        spread: 120,
+        particleCount: 25,
+        spread: 100,
         ticks: 80,
-        gravity: 0.6,
-        decay: 0.94,
+        gravity: 0.5,
+        decay: 0.93,
         startVelocity: 20,
         origin: { x: centerX, y: centerY },
-        shapes: shapes,
-        scalar: 3,
+        shapes: ["star"],
+        scalar: 1.5,
         colors: colors,
         zIndex: 200,
       });
       confetti({
-        particleCount: 10,
-        spread: 90,
+        particleCount: 12,
+        spread: 80,
         ticks: 60,
-        gravity: 0,
+        gravity: 0.3,
         decay: 0.95,
-        startVelocity: 12,
+        startVelocity: 14,
         origin: { x: centerX, y: centerY },
         shapes: ["circle"],
         scalar: 1,
@@ -126,8 +138,7 @@
     };
 
     shoot();
-    setTimeout(shoot, 150);
-    setTimeout(shoot, 300);
+    setTimeout(shoot, 180);
   }
 
   // ── Render grid on canvas ──
