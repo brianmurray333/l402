@@ -537,8 +537,15 @@
     fetch("/api/million/grid")
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (data.length !== blocks.length) {
-          var newBlocks = data.slice(blocks.length);
+        var knownIds = {};
+        for (var k = 0; k < blocks.length; k++) {
+          knownIds[blocks[k].id] = true;
+        }
+        var newBlocks = [];
+        for (var j = 0; j < data.length; j++) {
+          if (!knownIds[data[j].id]) newBlocks.push(data[j]);
+        }
+        if (data.length !== blocks.length || newBlocks.length > 0) {
           blocks = data;
           drawGrid();
           for (var i = 0; i < newBlocks.length; i++) {
