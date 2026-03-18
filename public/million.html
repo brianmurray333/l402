@@ -141,12 +141,12 @@
         font-size: 0.78rem;
         pointer-events: none;
         display: none;
-        white-space: nowrap;
         max-width: 260px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        overflow: hidden;
       }
-      .million-tooltip-title { font-weight: 600; margin-bottom: 2px; }
-      .million-tooltip-meta { color: var(--muted); font-size: 0.72rem; }
+      .million-tooltip-title { font-weight: 600; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .million-tooltip-meta { color: var(--muted); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
       .million-grid-hint {
         text-align: center;
