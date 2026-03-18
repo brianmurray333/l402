@@ -2220,6 +2220,7 @@ app.post("/api/lottery/enter", async (req, res) => {
 
 /* GET grid state — all pixel blocks (public, free) */
 app.get("/api/million/grid", async (_req, res) => {
+  autoSettlePendingPurchases();
   const blocks = await readPixelBlocks();
   res.json(blocks);
 });
