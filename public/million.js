@@ -547,5 +547,11 @@
   renderLeaderboard();
   renderRecent();
 
+  setTimeout(function () {
+    for (var i = 0; i < blocks.length; i++) {
+      animateNewBlock(blocks[i]);
+    }
+  }, 800);
+
   setInterval(refreshData, 5000);
 })();
