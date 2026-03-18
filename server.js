@@ -55,6 +55,7 @@ const MILLION_GRID_SIZE = 1000;
 const MILLION_TOTAL_PIXELS = MILLION_GRID_SIZE * MILLION_GRID_SIZE;
 const MILLION_MIN_PIXELS = 1;
 const MILLION_MAX_PIXELS = 100000;
+const MILLION_OVERLAP_MULTIPLIER = 5;
 const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 
 const SITE_HOST = process.env.SITE_HOST || "https://www.l402apps.com";
@@ -442,6 +443,71 @@ const checkPixelOverlap = async (x, y, w, h) => {
     }
   }
   return false;
+};
+
+const countPixelOverlap = (x, y, w, h, blocks) => {
+  let overlapPixels = 0;
+  for (const b of blocks) {
+    const ix1 = Math.max(x, b.x);
+    const iy1 = Math.max(y, b.y);
+    const ix2 = Math.min(x + w, b.x + b.width);
+    const iy2 = Math.min(y + h, b.y + b.height);
+    if (ix2 > ix1 && iy2 > iy1) overlapPixels += (ix2 - ix1) * (iy2 - iy1);
+  }
+  return overlapPixels;
+};
+
+const calculatePixelCost = (totalPixels, overlapPixels) => {
+  const freePixels = totalPixels - overlapPixels;
+  return freePixels + overlapPixels * MILLION_OVERLAP_MULTIPLIER;
+};
+
+const findFreeSpace = async (w, h) => {
+  const blocks = await readPixelBlocks();
+  const maxX = MILLION_GRID_SIZE - w;
+  const maxY = MILLION_GRID_SIZE - h;
+  if (maxX < 0 || maxY < 0) return null;
+
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const x = Math.floor(Math.random() * (maxX + 1));
+    const y = Math.floor(Math.random() * (maxY + 1));
+    if (countPixelOverlap(x, y, w, h, blocks) === 0) {
+      return { x, y, overlapPixels: 0 };
+    }
+  }
+
+  let bestX = 0, bestY = 0, bestOverlap = Infinity;
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const x = Math.floor(Math.random() * (maxX + 1));
+    const y = Math.floor(Math.random() * (maxY + 1));
+    const overlap = countPixelOverlap(x, y, w, h, blocks);
+    if (overlap < bestOverlap) {
+      bestOverlap = overlap;
+      bestX = x;
+      bestY = y;
+    }
+  }
+  return { x: bestX, y: bestY, overlapPixels: bestOverlap };
+};
+
+const fetchImageFromUrl = async (url) => {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "L402Apps/1.0" },
+    redirect: "follow",
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`Failed to fetch image: HTTP ${response.status}`);
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.startsWith("image/")) {
+    throw new Error(`URL did not return an image (got ${contentType})`);
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > 2 * 1024 * 1024) throw new Error("Image too large (max 2MB)");
+  const mime = contentType.split(";")[0].trim().replace("image/jpg", "image/jpeg");
+  if (!["image/png", "image/jpeg", "image/webp"].includes(mime)) {
+    throw new Error(`Unsupported image format: ${mime}. Use PNG, JPEG, or WebP.`);
+  }
+  return `data:${mime};base64,${buffer.toString("base64")}`;
 };
 
 const getPixelStats = async () => {
@@ -1251,7 +1317,7 @@ const serveIndex = async (_req, res) => {
 };
 
 /* ── Express Setup ── */
-app.use(express.json());
+app.use(express.json({ limit: "3mb" }));
 
 /* Serve index with injected data BEFORE static middleware */
 app.get("/", serveIndex);
@@ -1319,20 +1385,21 @@ app.get("/.well-known/l402.json", (_req, res) => {
       id, name, method, endpoint, description, cost, costType, direction,
     })),
     millionSatHomepage: {
-      description: "The Million Sat Homepage — own a piece of Bitcoin internet history. 1 sat per pixel. All proceeds donated to OpenSats.",
+      description: "The Million Sat Homepage — own a piece of Bitcoin internet history. 1 sat per pixel for free space, 5x per pixel when overlapping existing blocks. All proceeds donated to OpenSats.",
       gridSize: MILLION_GRID_SIZE,
       totalPixels: MILLION_TOTAL_PIXELS,
       costPerPixel: 1,
+      overlapMultiplier: MILLION_OVERLAP_MULTIPLIER,
       minPixels: MILLION_MIN_PIXELS,
       maxPixels: MILLION_MAX_PIXELS,
       pageUrl: `${SITE_HOST}/million`,
       endpoints: {
         grid: { method: "GET", url: `${SITE_HOST}/api/million/grid`, description: "Get all purchased pixel blocks (free)." },
         stats: { method: "GET", url: `${SITE_HOST}/api/million/stats`, description: "Get grid stats: total pixels sold, sats raised, leaderboard (free)." },
-        check: { method: "POST", url: `${SITE_HOST}/api/million/check`, description: "Check if a region is available. Send {x, y, width, height}.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1" } },
-        buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. Send {x, y, width, height, color?, imageData?, link?, title?}. Returns 402 with invoice on first call; pay and retry with Authorization: L402 macaroon:preimage header.", body: { x: "integer 0-999", y: "integer 0-999", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageData: "base64 data URL of image — use a rasterized format (PNG or JPEG). IMPORTANT: source image should be 3-5x the block dimensions for crisp rendering (e.g. 250x250 source for a 50x50 block). The canvas scales it down with smooth interpolation. If your encoded image is under 1KB for blocks larger than a few pixels, something is wrong — verify the image before submitting. Do NOT use SVG data URLs.", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
+        check: { method: "POST", url: `${SITE_HOST}/api/million/check`, description: "Check region availability and cost. x and y are optional — omit them for auto-placement. Returns overlapPixels count and total costSats.", body: { x: "integer 0-999 (optional — omit for auto-placement)", y: "integer 0-999 (optional — omit for auto-placement)", width: "integer >=1", height: "integer >=1" } },
+        buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. x and y are optional — omit for auto-placement. Use imageUrl instead of imageData to let the server fetch your logo directly (avoids payload limits, better quality). Overlapping existing pixels costs 5x per overlapping pixel.", body: { x: "integer 0-999 (optional — omit for auto-placement)", y: "integer 0-999 (optional — omit for auto-placement)", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageUrl: "URL to a PNG/JPEG/WebP image (recommended — server fetches and stores it, max 2MB). Preferred over imageData.", imageData: "base64 data URL of image (alternative to imageUrl). Use 3-5x block dimensions for crisp rendering.", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
       },
-      agentInstructions: "To buy pixels: 1) POST /api/million/check to verify availability, 2) POST /api/million/buy with your desired region — you'll get a 402 with an invoice, 3) Pay the Lightning invoice, 4) POST /api/million/buy again with the SAME request body plus Authorization: L402 <macaroon>:<preimage> header to confirm. Cost = width * height sats (1 sat per pixel). IMAGE TIPS: Use a real PNG/JPEG image at 3-5x the block dimensions (e.g. 250x250 for a 50x50 block). Verify your base64 output is a valid image — if under 1KB for anything larger than a few pixels, the image is likely blank/broken.",
+      agentInstructions: `To buy pixels: 1) POST /api/million/buy with {width, height} (x/y optional — omit for auto-placement) — you'll get a 402 with an invoice, coordinates, and cost breakdown. 2) Pay the Lightning invoice. 3) POST /api/million/buy again with the SAME body plus Authorization: L402 <macaroon>:<preimage> header. PRICING: 1 sat per free pixel. Overlapping existing blocks costs ${MILLION_OVERLAP_MULTIPLIER}x per overlapping pixel. The 402 response includes overlapPixels and the final amountSats. IMAGES: Prefer imageUrl over imageData — just pass a URL to a PNG/JPEG/WebP and the server fetches it directly. This avoids base64 encoding and payload size limits.`,
     },
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
@@ -2151,18 +2218,36 @@ app.get("/api/million/stats", async (_req, res) => {
 
 /* POST check region availability (free) */
 app.post("/api/million/check", async (req, res) => {
-  const { x, y, width, height } = req.body || {};
-  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(width) || !Number.isInteger(height)) {
-    return res.status(400).json({ error: "x, y, width, height must be integers." });
+  const { width, height } = req.body || {};
+  let { x, y } = req.body || {};
+
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    return res.status(400).json({ error: "width and height must be positive integers." });
+  }
+
+  const totalPixels = width * height;
+  const blocks = await readPixelBlocks();
+
+  if (x == null || y == null) {
+    const placement = await findFreeSpace(width, height);
+    if (!placement) return res.status(400).json({ error: "Block dimensions exceed grid size." });
+    x = placement.x;
+    y = placement.y;
+    const overlapPixels = placement.overlapPixels;
+    const costSats = calculatePixelCost(totalPixels, overlapPixels);
+    return res.json({ available: overlapPixels === 0, x, y, width, height, totalPixels, overlapPixels, costSats, autoPlaced: true });
+  }
+
+  if (!Number.isInteger(x) || !Number.isInteger(y)) {
+    return res.status(400).json({ error: "x and y must be integers." });
   }
   if (x < 0 || y < 0 || x + width > MILLION_GRID_SIZE || y + height > MILLION_GRID_SIZE) {
     return res.status(400).json({ error: `Coordinates must be within 0–${MILLION_GRID_SIZE - 1}.` });
   }
-  if (width < 1 || height < 1) {
-    return res.status(400).json({ error: "Width and height must be at least 1." });
-  }
-  const overlaps = await checkPixelOverlap(x, y, width, height);
-  res.json({ available: !overlaps, x, y, width, height, costSats: width * height });
+
+  const overlapPixels = countPixelOverlap(x, y, width, height, blocks);
+  const costSats = calculatePixelCost(totalPixels, overlapPixels);
+  res.json({ available: overlapPixels === 0, x, y, width, height, totalPixels, overlapPixels, costSats, autoPlaced: false });
 });
 
 /* POST buy pixels (L402-gated, variable amount) */
@@ -2171,17 +2256,22 @@ app.post("/api/million/buy", async (req, res) => {
     return res.status(503).json({ error: "L402 not configured" });
   }
 
-  const { x, y, width, height, color, imageData, link, title } = req.body || {};
+  let { x, y, width, height, color, imageData, imageUrl, link, title } = req.body || {};
 
-  if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(width) || !Number.isInteger(height)) {
-    return res.status(400).json({ error: "x, y, width, height must be integers." });
-  }
-  if (x < 0 || y < 0 || x + width > MILLION_GRID_SIZE || y + height > MILLION_GRID_SIZE) {
-    return res.status(400).json({ error: `Coordinates must be within 0–${MILLION_GRID_SIZE - 1}.` });
+  if (!Number.isInteger(width) || !Number.isInteger(height)) {
+    return res.status(400).json({ error: "width and height must be integers." });
   }
   const totalPixels = width * height;
   if (totalPixels < MILLION_MIN_PIXELS || totalPixels > MILLION_MAX_PIXELS) {
     return res.status(400).json({ error: `Total pixels must be between ${MILLION_MIN_PIXELS} and ${MILLION_MAX_PIXELS.toLocaleString()}.` });
+  }
+
+  if (imageUrl && !imageData) {
+    try {
+      imageData = await fetchImageFromUrl(imageUrl);
+    } catch (err) {
+      return res.status(400).json({ error: `Could not fetch imageUrl: ${err.message}` });
+    }
   }
 
   if (imageData) {
@@ -2195,21 +2285,35 @@ app.post("/api/million/buy", async (req, res) => {
     }
   }
 
-  const amountSats = totalPixels;
+  let autoPlaced = false;
+  if (x == null || y == null) {
+    const placement = await findFreeSpace(width, height);
+    if (!placement) return res.status(400).json({ error: "Block dimensions exceed grid size." });
+    x = placement.x;
+    y = placement.y;
+    autoPlaced = true;
+  }
+
+  if (!Number.isInteger(x) || !Number.isInteger(y)) {
+    return res.status(400).json({ error: "x and y must be integers." });
+  }
+  if (x < 0 || y < 0 || x + width > MILLION_GRID_SIZE || y + height > MILLION_GRID_SIZE) {
+    return res.status(400).json({ error: `Coordinates must be within 0–${MILLION_GRID_SIZE - 1}.` });
+  }
+
+  const blocks = await readPixelBlocks();
+  const overlapPixels = countPixelOverlap(x, y, width, height, blocks);
+  const amountSats = calculatePixelCost(totalPixels, overlapPixels);
 
   const authHeader = req.headers["authorization"];
   const l402 = parseL402Header(authHeader);
 
   if (!l402) {
-    const overlaps = await checkPixelOverlap(x, y, width, height);
-    if (overlaps) {
-      return res.status(409).json({ error: "Some of those pixels are already taken. Pick a different region." });
-    }
-
     try {
+      const overlapNote = overlapPixels > 0 ? ` (${overlapPixels} overlap at ${MILLION_OVERLAP_MULTIPLIER}x)` : "";
       const { paymentHash, paymentRequest } = await createLndInvoice(
         amountSats,
-        `Million Sat Homepage — ${totalPixels} pixel${totalPixels === 1 ? "" : "s"} at (${x},${y})`
+        `Million Sat Homepage — ${totalPixels} pixel${totalPixels === 1 ? "" : "s"} at (${x},${y})${overlapNote}`
       );
       const macaroon = mintL402Token(paymentHash);
 
@@ -2240,6 +2344,10 @@ app.post("/api/million/buy", async (req, res) => {
           paymentHash,
           amountSats,
           totalPixels,
+          overlapPixels,
+          overlapMultiplier: overlapPixels > 0 ? MILLION_OVERLAP_MULTIPLIER : 1,
+          x, y, width, height,
+          autoPlaced,
           qrCode: qrDataUrl,
         });
     } catch (error) {
@@ -2265,7 +2373,6 @@ app.post("/api/million/buy", async (req, res) => {
     console.error("Could not look up pixel invoice amount:", err.message);
   }
 
-  // Check if already completed
   const existingBlocks = await readPixelBlocks();
   const existing = existingBlocks.find(b => b.paymentHash === paymentHash);
   if (existing) {
@@ -2273,7 +2380,6 @@ app.post("/api/million/buy", async (req, res) => {
     return res.json({ success: true, block: existing, stats: await getPixelStats() });
   }
 
-  // Load from DB (persists across serverless instances); fall back to request body
   let purchaseData = await loadPendingPixelPurchase(paymentHash);
   if (!purchaseData) {
     purchaseData = {
@@ -2286,11 +2392,6 @@ app.post("/api/million/buy", async (req, res) => {
     };
   }
   await deletePendingPixelPurchase(paymentHash);
-
-  const overlaps = await checkPixelOverlap(purchaseData.x, purchaseData.y, purchaseData.width, purchaseData.height);
-  if (overlaps) {
-    return res.status(409).json({ error: "Those pixels were claimed while you were paying. Please pick a different region." });
-  }
 
   const block = {
     id: crypto.randomUUID(),
