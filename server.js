@@ -2557,7 +2557,7 @@ const autoSettlePendingPurchases = async () => {
     autoSettleRunning = false;
   }
 };
-setInterval(autoSettlePendingPurchases, 3000);
+setInterval(autoSettlePendingPurchases, 2000);
 
 app.listen(PORT, () => {
   console.log(`L402 marketplace running on http://localhost:${PORT}`);

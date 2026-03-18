@@ -574,5 +574,5 @@
   renderLeaderboard();
   renderRecent();
 
-  setInterval(refreshData, 5000);
+  setInterval(refreshData, 3000);
 })();
