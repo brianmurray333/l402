@@ -564,6 +564,19 @@ const deletePendingPixelPurchase = async (paymentHash) => {
   } catch (_) {}
 };
 
+const loadAllPendingPixelPurchases = async () => {
+  try {
+    const { data } = await supabase.from("pending_pixel_purchases").select("*");
+    if (!data) return [];
+    return data.map(d => ({
+      paymentHash: d.payment_hash,
+      x: d.x, y: d.y, width: d.width, height: d.height,
+      color: d.color, imageData: d.image_data,
+      link: d.link, title: d.title, amountSats: d.amount_sats,
+    }));
+  } catch (_) { return []; }
+};
+
 // ── Apps catalog (read from Supabase, fallback to JSON) ──
 const readApps = async () => {
   if (supabase) {
@@ -1400,7 +1413,7 @@ app.get("/.well-known/l402.json", (_req, res) => {
         buy: { method: "POST", url: `${SITE_HOST}/api/million/buy`, description: "Buy pixels via L402. x and y are optional — omit for auto-placement. Use imageUrl instead of imageData to let the server fetch your logo directly (avoids payload limits, better quality). Overlapping existing pixels costs 5x per overlapping pixel.", body: { x: "integer 0-999 (optional — omit for auto-placement)", y: "integer 0-999 (optional — omit for auto-placement)", width: "integer >=1", height: "integer >=1", color: "hex color string (optional, default #ff9900)", imageUrl: "URL to a PNG/JPEG/WebP image (recommended — server fetches and stores it, max 2MB). Preferred over imageData.", imageData: "base64 data URL of image (alternative to imageUrl). Use 3-5x block dimensions for crisp rendering.", link: "URL to link to when clicked (optional)", title: "display name / tooltip (optional, max 100 chars)" } },
         status: { method: "GET", url: `${SITE_HOST}/api/million/buy/status/{paymentHash}`, description: "Poll for payment status. Returns {paid: false} if unpaid. Once the invoice is paid, auto-completes the purchase and returns {paid: true, success: true, block, stats}. Idempotent — safe to call repeatedly. Use the paymentHash from the 402 response." },
       },
-      agentInstructions: `To buy pixels: 1) POST /api/million/buy with {width, height} (x/y optional — omit for auto-placement) — you'll get a 402 with an invoice, paymentHash, coordinates, and cost breakdown. 2) Show the invoice to the user to pay. 3) RECOMMENDED: Poll GET /api/million/buy/status/{paymentHash} every 2-3 seconds. Once the user pays, it returns {paid: true, success: true, block, stats} and the purchase is complete — no preimage needed. ALTERNATIVE: If you have the preimage, POST /api/million/buy again with the SAME body plus Authorization: L402 <macaroon>:<preimage> header. PRICING: 1 sat per free pixel. Overlapping existing blocks costs ${MILLION_OVERLAP_MULTIPLIER}x per overlapping pixel. The 402 response includes overlapPixels and the final amountSats. IMAGES: Prefer imageUrl over imageData — just pass a URL to a PNG/JPEG/WebP and the server fetches it directly. This avoids base64 encoding and payload size limits.`,
+      agentInstructions: `To buy pixels: 1) POST /api/million/buy with {width, height} (x/y optional — omit for auto-placement) — you'll get a 402 with an invoice, paymentHash, coordinates, and cost breakdown. 2) Show the Lightning invoice to the user to pay. 3) WAIT — the server automatically detects payment every 3 seconds and completes the purchase. You can confirm completion by polling GET /api/million/buy/status/{paymentHash} — it returns {paid: true, success: true, block, stats} once settled. ALTERNATIVE: If you have the preimage, you can POST /api/million/buy again with the SAME body plus Authorization: L402 <macaroon>:<preimage> header to complete immediately. PRICING: 1 sat per free pixel. Overlapping existing blocks costs ${MILLION_OVERLAP_MULTIPLIER}x per overlapping pixel. The 402 response includes overlapPixels and the final amountSats. IMAGES: Prefer imageUrl over imageData — just pass a URL to a PNG/JPEG/WebP and the server fetches it directly. This avoids base64 encoding and payload size limits.`,
     },
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
@@ -2490,6 +2503,61 @@ app.get("*", (req, res) => {
     if (err) serveIndex(req, res);
   });
 });
+
+/* ── Background: auto-settle pending pixel purchases ── */
+let autoSettleRunning = false;
+const autoSettlePendingPurchases = async () => {
+  if (autoSettleRunning || !l402Enabled) return;
+  autoSettleRunning = true;
+  try {
+    const pending = await loadAllPendingPixelPurchases();
+    if (pending.length === 0) return;
+
+    const existingBlocks = await readPixelBlocks();
+    for (const purchase of pending) {
+      const already = existingBlocks.find(b => b.paymentHash === purchase.paymentHash);
+      if (already) {
+        await deletePendingPixelPurchase(purchase.paymentHash);
+        continue;
+      }
+
+      try {
+        const { paid } = await checkInvoicePaid(purchase.paymentHash);
+        if (!paid) continue;
+      } catch (_) { continue; }
+
+      let paidAmountSats = purchase.amountSats;
+      try {
+        const inv = await lookupLndInvoice(purchase.paymentHash);
+        const looked = parseInt(inv.value || inv.amt_paid_sat || "0", 10);
+        if (looked > 0) paidAmountSats = looked;
+      } catch (_) {}
+
+      await deletePendingPixelPurchase(purchase.paymentHash);
+
+      const block = {
+        id: crypto.randomUUID(),
+        x: purchase.x, y: purchase.y, width: purchase.width, height: purchase.height,
+        color: purchase.color || "#ff9900",
+        imageData: purchase.imageData || null,
+        link: purchase.link || null,
+        title: (purchase.title || "").trim().slice(0, 100) || null,
+        paymentHash: purchase.paymentHash,
+        amountSats: paidAmountSats,
+        createdAt: new Date().toISOString(),
+      };
+
+      await writePixelBlock(block);
+      const px = block.width * block.height;
+      console.log(`🟧 Million Sat (auto-settle): ${px} pixel${px === 1 ? "" : "s"} at (${block.x},${block.y}) for ${block.amountSats} sats — "${block.title || "Anonymous"}"`);
+    }
+  } catch (err) {
+    console.error("Auto-settle error:", err.message);
+  } finally {
+    autoSettleRunning = false;
+  }
+};
+setInterval(autoSettlePendingPurchases, 3000);
 
 app.listen(PORT, () => {
   console.log(`L402 marketplace running on http://localhost:${PORT}`);
