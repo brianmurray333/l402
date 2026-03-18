@@ -76,9 +76,9 @@
   }
 
   // ── New-block confetti animation ──
-  var coinShape = null;
+  var btcShape = null;
   if (typeof confetti !== "undefined" && confetti.shapeFromText) {
-    coinShape = confetti.shapeFromText({ text: "🪙", scalar: 3 });
+    btcShape = confetti.shapeFromText({ text: "₿", scalar: 3, color: "#f7931a" });
   }
 
   function animateNewBlock(block) {
@@ -91,54 +91,38 @@
     var centerX = (wrapRect.left + block.x * sx + (block.width * sx) / 2) / window.innerWidth;
     var centerY = (wrapRect.top + block.y * sy + (block.height * sy) / 2) / window.innerHeight;
 
-    var colors = ["#ff9900", "#f7931a", "#ffb84d", "#ffd700", "#e8860c"];
+    var shapes = btcShape ? [btcShape] : ["circle"];
 
     var shoot = function () {
-      if (coinShape) {
-        confetti({
-          particleCount: 20,
-          spread: 100,
-          ticks: 90,
-          gravity: 0.7,
-          decay: 0.93,
-          startVelocity: 22,
-          origin: { x: centerX, y: centerY },
-          shapes: [coinShape],
-          scalar: 3,
-          zIndex: 200,
-          flat: true,
-        });
-      }
       confetti({
-        particleCount: 25,
-        spread: 100,
+        particleCount: 30,
+        spread: 120,
         ticks: 80,
-        gravity: 0.5,
-        decay: 0.93,
+        gravity: 0.6,
+        decay: 0.94,
         startVelocity: 20,
         origin: { x: centerX, y: centerY },
-        shapes: ["star"],
-        scalar: 1.5,
-        colors: colors,
+        shapes: shapes,
+        scalar: 3,
         zIndex: 200,
       });
       confetti({
-        particleCount: 12,
-        spread: 80,
+        particleCount: 10,
+        spread: 90,
         ticks: 60,
-        gravity: 0.3,
+        gravity: 0,
         decay: 0.95,
-        startVelocity: 14,
+        startVelocity: 12,
         origin: { x: centerX, y: centerY },
-        shapes: ["circle"],
-        scalar: 1,
-        colors: colors,
+        shapes: shapes,
+        scalar: 2,
         zIndex: 200,
       });
     };
 
     shoot();
-    setTimeout(shoot, 180);
+    setTimeout(shoot, 150);
+    setTimeout(shoot, 300);
   }
 
   // ── Render grid on canvas ──
