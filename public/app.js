@@ -356,6 +356,7 @@ var createApiCard = function (api) {
     var ic = document.createElement("img");
     ic.src = api.icon;
     ic.alt = "";
+    ic.loading = "lazy";
     ic.className = "api-card-icon";
     ic.onerror = function () {
       var fallback = document.createElement("span");

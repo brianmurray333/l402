@@ -5,6 +5,10 @@
   var stats = window.__PIXEL_STATS__ || { totalPixels: 0, totalSats: 0, blockCount: 0, leaderboard: [] };
 
   var GRID = 1000;
+  var CELL_SIZE = 10;
+  var NUM_CELLS = GRID / CELL_SIZE;
+  var spatialGrid = {};
+
   var canvas = document.getElementById("grid-canvas");
   var ctx;
   var gridWrap = document.getElementById("grid-wrap");
@@ -54,6 +58,16 @@
   var pxPixelCount = document.getElementById("px-pixel-count");
   var pxGetInvoice = document.getElementById("px-get-invoice");
   var pxFormStatus = document.getElementById("px-form-status");
+
+  var pxImageFile = document.getElementById("px-image-file");
+  var pxImageDrop = document.getElementById("px-image-drop");
+  var pxImageDropText = document.getElementById("px-image-drop-text");
+  var pxImagePreview = document.getElementById("px-image-preview");
+  var pxImageMeta = document.getElementById("px-image-meta");
+  var pxImageName = document.getElementById("px-image-name");
+  var pxImageClear = document.getElementById("px-image-clear");
+  var pxImageUrl = document.getElementById("px-image-url");
+  var pendingImageData = null;
 
   var pxQr = document.getElementById("px-qr");
   var pxInvoiceText = document.getElementById("px-invoice-text");
@@ -174,10 +188,31 @@
     };
   }
 
-  // ── Find block at pixel ──
+  // ── Spatial grid index for O(1) average block lookup ──
+  function buildSpatialIndex() {
+    spatialGrid = {};
+    for (var idx = 0; idx < blocks.length; idx++) {
+      var b = blocks[idx];
+      var x0 = (b.x / CELL_SIZE) | 0;
+      var y0 = (b.y / CELL_SIZE) | 0;
+      var x1 = ((b.x + b.width - 1) / CELL_SIZE) | 0;
+      var y1 = ((b.y + b.height - 1) / CELL_SIZE) | 0;
+      for (var cy = y0; cy <= y1; cy++) {
+        for (var cx = x0; cx <= x1; cx++) {
+          var key = cy * NUM_CELLS + cx;
+          if (!spatialGrid[key]) spatialGrid[key] = [];
+          spatialGrid[key].push(b);
+        }
+      }
+    }
+  }
+
   function blockAtPixel(px, py) {
-    for (var i = blocks.length - 1; i >= 0; i--) {
-      var b = blocks[i];
+    var key = ((py / CELL_SIZE) | 0) * NUM_CELLS + ((px / CELL_SIZE) | 0);
+    var cell = spatialGrid[key];
+    if (!cell) return null;
+    for (var i = cell.length - 1; i >= 0; i--) {
+      var b = cell[i];
       if (px >= b.x && px < b.x + b.width && py >= b.y && py < b.y + b.height) {
         return b;
       }
@@ -347,6 +382,67 @@
     }
   });
 
+  // ── Image upload ──
+  function handleImageFile(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      pxFormStatus.textContent = "Image too large (max 2 MB).";
+      pxFormStatus.className = "px-status px-status--error";
+      return;
+    }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      pxFormStatus.textContent = "Use PNG, JPEG, or WebP.";
+      pxFormStatus.className = "px-status px-status--error";
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      pendingImageData = e.target.result;
+      pxImagePreview.src = pendingImageData;
+      pxImagePreview.style.display = "block";
+      pxImageDropText.style.display = "none";
+      pxImageMeta.style.display = "flex";
+      pxImageName.textContent = file.name;
+      pxImageUrl.value = "";
+      pxImageUrl.disabled = true;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearImage() {
+    pendingImageData = null;
+    pxImageFile.value = "";
+    pxImagePreview.style.display = "none";
+    pxImagePreview.src = "";
+    pxImageDropText.style.display = "";
+    pxImageMeta.style.display = "none";
+    pxImageName.textContent = "";
+    pxImageUrl.disabled = false;
+  }
+
+  pxImageFile.addEventListener("change", function () {
+    handleImageFile(this.files[0]);
+  });
+
+  pxImageClear.addEventListener("click", function (e) {
+    e.preventDefault();
+    clearImage();
+  });
+
+  pxImageDrop.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    this.classList.add("dragover");
+  });
+  pxImageDrop.addEventListener("dragleave", function () {
+    this.classList.remove("dragover");
+  });
+  pxImageDrop.addEventListener("drop", function (e) {
+    e.preventDefault();
+    this.classList.remove("dragover");
+    var files = e.dataTransfer && e.dataTransfer.files;
+    if (files && files.length) handleImageFile(files[0]);
+  });
+
   // ── Modal ──
   function openModal() {
     formStep.style.display = "";
@@ -355,6 +451,7 @@
     pxFormStatus.textContent = "";
     pxFormStatus.className = "px-status";
     pxGetInvoice.disabled = false;
+    clearImage();
     modal.classList.add("is-open");
     modal.setAttribute("aria-hidden", "false");
     updateCost();
@@ -423,12 +520,18 @@
     pxFormStatus.textContent = "Checking availability...";
     pxFormStatus.className = "px-status";
 
+    var imgUrl = pxImageUrl.value.trim();
     var body = {
       x: x, y: y, width: w, height: h,
       color: pxColorHex.value || "#ff9900",
       link: pxLink.value.trim() || undefined,
       title: pxTitle.value.trim() || undefined,
     };
+    if (pendingImageData) {
+      body.imageData = pendingImageData;
+    } else if (imgUrl) {
+      body.imageUrl = imgUrl;
+    }
 
     fetch("/api/million/buy", {
       method: "POST",
@@ -508,6 +611,7 @@
                 if (result.success) {
                   blocks.push(result.block);
                   stats = result.stats;
+                  buildSpatialIndex();
                   drawGrid();
                   animateNewBlock(result.block);
                   renderStats();
@@ -547,6 +651,7 @@
         }
         if (data.length !== blocks.length || newBlocks.length > 0) {
           blocks = data;
+          buildSpatialIndex();
           drawGrid();
           for (var i = 0; i < newBlocks.length; i++) {
             animateNewBlock(newBlocks[i]);
@@ -569,6 +674,7 @@
   }
 
   // ── Init ──
+  buildSpatialIndex();
   drawGrid();
   renderStats();
   renderLeaderboard();
