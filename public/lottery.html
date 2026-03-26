@@ -12,7 +12,7 @@
     <meta property="og:image" content="https://www.l402apps.com/images/lottery.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/png" href="/images/bitcoin.png" />
     <link rel="stylesheet" href="/styles.css" />
     <style>
@@ -35,33 +35,18 @@
         max-width: 480px;
         padding: 32px;
         border-radius: 20px;
-        background: linear-gradient(140deg, rgba(16, 22, 36, 0.9), rgba(7, 10, 16, 0.6));
+        background: var(--bg-card);
         border: 1px solid var(--stroke);
         text-align: center;
         position: relative;
         overflow: hidden;
-      }
-      .lottery-pot-card::before {
-        content: "";
-        position: absolute;
-        inset: -1px;
-        border-radius: 20px;
-        padding: 1px;
-        background: linear-gradient(140deg, rgba(57, 240, 209, 0.3), rgba(91, 124, 250, 0.15), transparent);
-        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-        mask-composite: exclude;
-        -webkit-mask-composite: xor;
-        pointer-events: none;
       }
 
       .pot-label { font-size: 0.85rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
       .pot-amount {
         font-size: clamp(2.5rem, 7vw, 4rem);
         font-weight: 700;
-        background: linear-gradient(120deg, var(--accent), var(--accent-2));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: var(--accent);
         margin: 0;
         line-height: 1.1;
       }
@@ -91,18 +76,17 @@
         padding: 14px 40px;
         border-radius: 999px;
         border: none;
-        background: linear-gradient(120deg, var(--accent), var(--accent-2));
-        color: #020409;
+        background: var(--accent);
+        color: #000;
         font-size: 1.05rem;
         font-weight: 700;
         cursor: pointer;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
         transition: all 0.2s;
-        box-shadow: 0 8px 24px rgba(57, 240, 209, 0.25);
       }
       .lottery-cta:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 12px 32px rgba(57, 240, 209, 0.4);
+        filter: brightness(1.1);
+        transform: translateY(-1px);
       }
 
       /* ── How it works ── */
@@ -114,9 +98,9 @@
       }
       .lottery-step {
         padding: 20px 16px;
-        border-radius: 14px;
+        border-radius: var(--radius);
         border: 1px solid var(--stroke);
-        background: rgba(9, 12, 20, 0.6);
+        background: var(--bg-card);
         text-align: center;
       }
       .lottery-step-num {
@@ -125,7 +109,7 @@
         justify-content: center;
         width: 32px; height: 32px;
         border-radius: 50%;
-        background: rgba(57, 240, 209, 0.12);
+        background: var(--accent-dim);
         color: var(--accent);
         font-weight: 700;
         font-size: 0.85rem;
@@ -150,8 +134,8 @@
         justify-content: space-between;
         align-items: center;
         padding: 12px 16px;
-        border-radius: 10px;
-        background: rgba(9, 12, 20, 0.5);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
         border: 1px solid var(--stroke);
         font-size: 0.85rem;
       }
@@ -165,8 +149,8 @@
         justify-content: space-between;
         align-items: center;
         padding: 14px 16px;
-        border-radius: 10px;
-        background: rgba(9, 12, 20, 0.5);
+        border-radius: var(--radius-sm);
+        background: var(--bg-card);
         border: 1px solid var(--stroke);
         font-size: 0.85rem;
       }
@@ -175,8 +159,8 @@
       .history-payout { font-weight: 600; color: var(--accent); }
       .history-date { color: var(--muted); font-size: 0.8rem; }
       .history-status { font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; }
-      .history-status--paid { background: rgba(57, 240, 209, 0.1); color: var(--accent); }
-      .history-status--failed { background: rgba(248, 180, 255, 0.1); color: var(--accent-3); }
+      .history-status--paid { background: var(--accent-dim); color: var(--accent); }
+      .history-status--failed { background: rgba(191, 90, 242, 0.1); color: var(--accent-3); }
       .history-status--noentries { background: rgba(255,255,255,0.05); color: var(--muted); }
 
       /* ── Ticket Modal ── */
@@ -198,9 +182,9 @@
         pointer-events: auto;
       }
       .ticket-modal-content {
-        background: rgba(13, 17, 26, 0.98);
+        background: var(--bg-card);
         border: 1px solid var(--stroke);
-        border-radius: 20px;
+        border-radius: var(--radius-lg);
         padding: 32px;
         width: 90%;
         max-width: 420px;
@@ -234,7 +218,7 @@
         background: rgba(5, 7, 11, 0.8);
         color: var(--text);
         font-size: 0.95rem;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
         outline: none;
         transition: border-color 0.2s;
       }
@@ -254,7 +238,7 @@
         color: var(--muted);
         font-size: 0.85rem;
         pointer-events: none;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
       }
 
       .ticket-field .field-hint {
@@ -278,7 +262,7 @@
         font-size: 0.95rem;
         font-weight: 700;
         cursor: pointer;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
         transition: all 0.2s;
         margin-top: 8px;
       }
@@ -308,7 +292,7 @@
         justify-content: center;
         flex-shrink: 0;
         transition: border-color 0.2s, color 0.2s;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
         line-height: 1;
       }
       .payout-menu-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -319,9 +303,9 @@
         right: 0;
         z-index: 10;
         min-width: 180px;
-        background: rgba(13, 17, 26, 0.98);
+        background: var(--bg-elevated);
         border: 1px solid var(--stroke);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         overflow: hidden;
         box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       }
@@ -334,12 +318,12 @@
         background: none;
         color: var(--muted);
         font-size: 0.85rem;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
         cursor: pointer;
         text-align: left;
         transition: background 0.15s, color 0.15s;
       }
-      .payout-menu-item:hover { background: rgba(57, 240, 209, 0.08); color: var(--text); }
+      .payout-menu-item:hover { background: var(--accent-dim); color: var(--text); }
       .payout-menu-item.is-active { color: var(--accent); }
       .payout-menu-item + .payout-menu-item { border-top: 1px solid var(--stroke); }
 
@@ -356,7 +340,7 @@
         width: 220px;
         height: 220px;
         border-radius: 12px;
-        background: #0d111a;
+        background: var(--bg-card);
       }
       .ticket-invoice-row {
         display: flex;
@@ -385,7 +369,7 @@
         font-size: 0.8rem;
         cursor: pointer;
         white-space: nowrap;
-        font-family: "Space Grotesk", sans-serif;
+        font-family: "Inter", sans-serif;
       }
       .ticket-status {
         font-size: 0.9rem;

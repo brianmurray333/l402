@@ -58,6 +58,58 @@ const MILLION_MAX_PIXELS = 100000;
 const MILLION_OVERLAP_MULTIPLIER = 5;
 const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 
+/* ── Rate Limiting (API submissions) ── */
+const API_SUB_RATE_IP_MAX = 3;           // max submissions per IP per window
+const API_SUB_RATE_IP_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const API_SUB_RATE_DOMAIN_MAX = 3;       // max endpoints from same domain per day
+const API_SUB_RATE_DAILY_MAX = 100;      // global daily cap on reward payouts (100 × 100 sats = 10,000 sats/day)
+
+const ipSubmissionLog = new Map(); // IP → [timestamps]
+
+function cleanIpLog() {
+  const cutoff = Date.now() - API_SUB_RATE_IP_WINDOW_MS;
+  for (const [ip, timestamps] of ipSubmissionLog) {
+    const recent = timestamps.filter((t) => t > cutoff);
+    if (recent.length === 0) ipSubmissionLog.delete(ip);
+    else ipSubmissionLog.set(ip, recent);
+  }
+}
+setInterval(cleanIpLog, 5 * 60 * 1000);
+
+function checkIpRate(ip) {
+  const cutoff = Date.now() - API_SUB_RATE_IP_WINDOW_MS;
+  const timestamps = (ipSubmissionLog.get(ip) || []).filter((t) => t > cutoff);
+  return timestamps.length < API_SUB_RATE_IP_MAX;
+}
+
+function recordIpSubmission(ip) {
+  const timestamps = ipSubmissionLog.get(ip) || [];
+  timestamps.push(Date.now());
+  ipSubmissionLog.set(ip, timestamps);
+}
+
+async function checkDomainRate(domain) {
+  if (!supabase) return true;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const pattern = `%${domain}%`;
+  const { count } = await supabase
+    .from("api_submissions")
+    .select("id", { count: "exact", head: true })
+    .ilike("endpoint", pattern)
+    .gte("submitted_at", since);
+  return (count || 0) < API_SUB_RATE_DOMAIN_MAX;
+}
+
+async function checkDailyGlobalRate() {
+  if (!supabase) return true;
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("api_submissions")
+    .select("id", { count: "exact", head: true })
+    .gte("submitted_at", since);
+  return (count || 0) < API_SUB_RATE_DAILY_MAX;
+}
+
 const SITE_HOST = process.env.SITE_HOST || "https://www.l402apps.com";
 
 // LND nodes typically use self-signed TLS certificates.
@@ -1801,6 +1853,29 @@ app.post("/api/api-submissions", async (req, res) => {
     return res.status(400).json({ error: "A valid API endpoint URL is required." });
   }
 
+  // Rate limiting
+  const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
+  if (!checkIpRate(clientIp)) {
+    return res.status(429).json({
+      error: `Too many submissions. Please wait before submitting again (max ${API_SUB_RATE_IP_MAX} per ${API_SUB_RATE_IP_WINDOW_MS / 60000} minutes).`,
+    });
+  }
+
+  let submissionDomain = "";
+  try { submissionDomain = new URL(rawUrl).hostname.replace(/^www\./, ""); } catch (_) {}
+
+  if (submissionDomain && !(await checkDomainRate(submissionDomain))) {
+    return res.status(429).json({
+      error: `Too many submissions for ${submissionDomain}. Max ${API_SUB_RATE_DOMAIN_MAX} endpoints per domain per 24 hours.`,
+    });
+  }
+
+  if (!(await checkDailyGlobalRate())) {
+    return res.status(429).json({
+      error: `Daily submission limit reached (${API_SUB_RATE_DAILY_MAX} per day). Please try again tomorrow.`,
+    });
+  }
+
   // Duplicate check
   if (await isDuplicateApi(rawUrl)) {
     return res.status(409).json({ error: "This API endpoint is already listed." });
@@ -1924,6 +1999,7 @@ app.post("/api/api-submissions", async (req, res) => {
   };
 
   await writeApiSubmission(entry);
+  recordIpSubmission(clientIp);
 
   try {
     await sendApiSubmissionEmail(entry);

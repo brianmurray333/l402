@@ -264,7 +264,7 @@ var updateConfirmationFields = function (metadata) {
 
 var setStatus = function (message, isError) {
   confirmStatus.textContent = message;
-  confirmStatus.style.color = isError ? "#f8b4ff" : "var(--muted)";
+  confirmStatus.style.color = isError ? "#ff453a" : "var(--muted)";
 };
 
 /* -- L402 Payment Flow (for app submission) -- */
@@ -873,7 +873,7 @@ apiConfirmForm.addEventListener("submit", async function (event) {
   if (!paymentInput) {
     if (apiConfirmStatus) {
       apiConfirmStatus.textContent = "Please paste a Lightning invoice or address.";
-      apiConfirmStatus.style.color = "#f8b4ff";
+      apiConfirmStatus.style.color = "#ff453a";
     }
     return;
   }
@@ -910,7 +910,7 @@ apiConfirmForm.addEventListener("submit", async function (event) {
   } catch (error) {
     if (apiConfirmStatus) {
       apiConfirmStatus.textContent = error.message;
-      apiConfirmStatus.style.color = "#f8b4ff";
+      apiConfirmStatus.style.color = "#ff453a";
     }
   } finally {
     apiSaveBtn.disabled = false;
