@@ -770,9 +770,7 @@ submissionForm.addEventListener("submit", async function (event) {
       pendingApiVerification = data;
       var confirmTitle = document.querySelector("#api-confirm-title");
       if (confirmTitle) {
-        confirmTitle.textContent = data.type === "compatible"
-          ? "✓ L402-Compatible Endpoint"
-          : "✓ Verified L402 Endpoint";
+        confirmTitle.textContent = "✓ Verified L402 Endpoint";
       }
       apiVerifyProvider.textContent = data.provider || "Unknown";
       apiVerifyMethod.textContent = data.method || "GET";
@@ -785,7 +783,7 @@ submissionForm.addEventListener("submit", async function (event) {
       closeSubmitModal();
       openApiModal();
     } catch (error) {
-      alert(error.message || "Could not verify endpoint. Make sure it returns HTTP 402 or 401 (L402-compatible).");
+      alert(error.message || "Could not verify endpoint. It must return HTTP 402 with a valid L402 challenge (WWW-Authenticate header with macaroon+invoice, or lnbc invoice in response body).");
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "Submit";

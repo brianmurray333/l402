@@ -737,12 +737,20 @@ const fetchMetadata = async (url) => {
 };
 
 /* ── L402 Endpoint Verification ── */
+const isValidL402Challenge = (wwwAuth, bodyInvoice) => {
+  if (!wwwAuth && !bodyInvoice) return false;
+  const hasL402Header =
+    /\bL402\b/i.test(wwwAuth) || /\bLSAT\b/i.test(wwwAuth);
+  const hasInvoiceInHeader = /invoice="(lnbc[^"]+)"/.test(wwwAuth);
+  const hasMacaroonInHeader = /macaroon="([^"]+)"/.test(wwwAuth);
+  const hasBodyInvoice =
+    typeof bodyInvoice === "string" && bodyInvoice.startsWith("lnbc");
+  return (hasL402Header && (hasInvoiceInHeader || hasMacaroonInHeader)) || hasBodyInvoice;
+};
+
 const verifyL402Endpoint = async (endpointUrl) => {
   const methods = ["GET", "POST"];
   let lastError = null;
-  let got401 = false;
-  let got401Method = null;
-  let got401WwwAuth = "";
 
   for (const method of methods) {
     try {
@@ -759,49 +767,33 @@ const verifyL402Endpoint = async (endpointUrl) => {
       });
       clearTimeout(timeout);
 
-      if (res.status === 402) {
-        const wwwAuth = res.headers.get("www-authenticate") || "";
-        const invoiceMatch = wwwAuth.match(/invoice="([^"]+)"/);
-
-        if (!invoiceMatch) {
-          try {
-            const body = await res.json();
-            if (body.invoice) {
-              return { verified: true, type: "full", method, invoice: body.invoice, wwwAuth };
-            }
-          } catch (_) {}
-          return { verified: true, type: "full", method, invoice: null, wwwAuth };
-        }
-
-        return { verified: true, type: "full", method, invoice: invoiceMatch[1], wwwAuth };
+      if (res.status !== 402) {
+        lastError = `${method} returned ${res.status} (expected 402)`;
+        continue;
       }
 
-      if (res.status === 401) {
-        got401 = true;
-        got401Method = method;
-        got401WwwAuth = res.headers.get("www-authenticate") || "";
-        // Check body for L402 hints
-        try {
-          const body = await res.json();
-          if (body.invoice) {
-            return { verified: true, type: "full", method, invoice: body.invoice, wwwAuth: got401WwwAuth };
-          }
-        } catch (_) {}
+      const wwwAuth = res.headers.get("www-authenticate") || "";
+      let bodyInvoice = null;
+      try {
+        const body = await res.json();
+        if (body.invoice) bodyInvoice = body.invoice;
+      } catch (_) {}
+
+      if (!isValidL402Challenge(wwwAuth, bodyInvoice)) {
+        lastError = `${method} returned 402 but without a valid L402 challenge (need WWW-Authenticate with L402 macaroon+invoice, or invoice in body starting with lnbc)`;
+        continue;
       }
 
-      lastError = `${method} returned ${res.status} (expected 402)`;
+      const invoiceMatch = wwwAuth.match(/invoice="([^"]+)"/);
+      const invoice = invoiceMatch ? invoiceMatch[1] : bodyInvoice;
+
+      return { verified: true, type: "full", method, invoice, wwwAuth };
     } catch (err) {
       lastError = `${method} failed: ${err.message}`;
     }
   }
 
-  // 401 means the endpoint requires auth -- it may accept L402 tokens
-  // even though it doesn't self-issue 402 challenges
-  if (got401) {
-    return { verified: true, type: "compatible", method: got401Method, invoice: null, wwwAuth: got401WwwAuth };
-  }
-
-  return { verified: false, error: lastError || "Endpoint did not return HTTP 402 or 401" };
+  return { verified: false, error: lastError || "Endpoint did not return HTTP 402 with a valid L402 challenge" };
 };
 
 /* ── Duplicate Detection ── */
@@ -1470,7 +1462,7 @@ app.get("/.well-known/l402.json", (_req, res) => {
     submission: {
       endpoint: `${SITE_HOST}/api/api-submissions`,
       method: "POST",
-      description: `Submit an L402 API endpoint. The site verifies your endpoint returns HTTP 402 (full L402) or 401 (L402-compatible), then pays you ${API_SUBMISSION_REWARD_SATS} sats.`,
+      description: `Submit an L402 API endpoint. The site verifies your endpoint returns HTTP 402 with a valid L402 challenge (WWW-Authenticate header with macaroon+invoice, or invoice in response body), then pays you ${API_SUBMISSION_REWARD_SATS} sats.`,
       rewardSats: API_SUBMISSION_REWARD_SATS,
       request: {
         url: { type: "string", required: true, description: "The L402 endpoint URL to verify and list." },
@@ -1478,7 +1470,7 @@ app.get("/.well-known/l402.json", (_req, res) => {
         lightningAddress: { type: "string", required: false, description: `A Lightning address (e.g. user@wallet.com) to receive ${API_SUBMISSION_REWARD_SATS} sats. Fallback if you cannot generate an invoice.` },
         description: { type: "string", required: false, description: "Optional human-readable description of the endpoint." },
       },
-      notes: "Provide either 'invoice' (preferred) or 'lightningAddress' (fallback). The endpoint URL is verified server-side — endpoints returning HTTP 402 (with L402 challenge) or 401 (L402-compatible, accepts L402 tokens) are both accepted.",
+      notes: "Provide either 'invoice' (preferred) or 'lightningAddress' (fallback). The endpoint URL is verified server-side — it must return HTTP 402 with a valid L402 challenge: either a WWW-Authenticate header containing L402/LSAT with macaroon+invoice fields, or an invoice (starting with lnbc) in the JSON response body.",
       example: {
         curl: `curl -X POST ${SITE_HOST}/api/api-submissions -H "Content-Type: application/json" -d '{"url":"https://api.example.com/v1/resource","lightningAddress":"you@wallet.com"}'`,
       },
