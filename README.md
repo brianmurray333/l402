@@ -15,3 +15,4 @@ Set these in `.env`:
 - `PORT`: Optional, defaults to `3000`.
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`: Required in production when Lightning rewards are enabled, so daily and IP limits apply across serverless instances. Apply `supabase-migration.sql` in the Supabase SQL editor (includes `api_submission_rate_events` for IP throttling).
 - Optional `SUPABASE_ACCESS_TOKEN` (personal access token, `sbp_…`): lets you run `node scripts/run-mgmt-sql.mjs` to apply `scripts/sql/apply-rate-events.sql` via the Management API instead of the SQL editor.
+- Optional `API_SUBMISSION_DAILY_MAX`: max paid API listing rewards per **UTC calendar day** (default `100`, never above `100`). Set lower to tighten (e.g. `50`).

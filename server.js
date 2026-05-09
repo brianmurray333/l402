@@ -62,7 +62,14 @@ const l402Enabled = !!(LND_REST_HOST && LND_MACAROON_HEX && MACAROON_SECRET);
 const API_SUB_RATE_IP_MAX = 3;           // max submissions per IP per window
 const API_SUB_RATE_IP_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const API_SUB_RATE_DOMAIN_MAX = 3;       // max endpoints from same domain per day
-const API_SUB_RATE_DAILY_MAX = 100;      // global daily cap on reward payouts (100 × 100 sats = 10,000 sats/day)
+/** Max paid API submissions per UTC calendar day (never above 100). Optional API_SUBMISSION_DAILY_MAX env to lower. */
+const API_SUB_RATE_DAILY_MAX = Math.min(
+  100,
+  Math.max(1, (() => {
+    const raw = parseInt(process.env.API_SUBMISSION_DAILY_MAX || "100", 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 100;
+  })())
+);
 
 const ipSubmissionLog = new Map(); // IP → [timestamps]
 
@@ -124,13 +131,26 @@ async function checkDomainRate(domain) {
   return parentHits < API_SUB_RATE_DOMAIN_MAX;
 }
 
+/** Start (inclusive) and end (exclusive) of the current UTC calendar day, as ISO strings. */
+function utcCalendarDayBoundsIso() {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const d = now.getUTCDate();
+  const start = new Date(Date.UTC(y, m, d, 0, 0, 0, 0));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { startIso: start.toISOString(), endIso: end.toISOString() };
+}
+
 async function checkDailyGlobalRate() {
   if (!supabase) return true;
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const { startIso, endIso } = utcCalendarDayBoundsIso();
   const { count, error } = await supabase
     .from("api_submissions")
     .select("id", { count: "exact", head: true })
-    .gte("submitted_at", since);
+    .gte("submitted_at", startIso)
+    .lt("submitted_at", endIso);
   if (error) {
     console.warn("checkDailyGlobalRate: query failed — blocking submission:", error.message);
     return false;
@@ -1941,7 +1961,7 @@ app.post("/api/api-submissions", async (req, res) => {
 
   if (!(await checkDailyGlobalRate())) {
     return res.status(429).json({
-      error: `Daily submission limit reached (${API_SUB_RATE_DAILY_MAX} per day). Please try again tomorrow.`,
+      error: `Daily submission limit reached (${API_SUB_RATE_DAILY_MAX} paid submissions per UTC calendar day). Try again after 00:00 UTC.`,
     });
   }
 
@@ -1999,6 +2019,12 @@ app.post("/api/api-submissions", async (req, res) => {
 
   // If L402 enabled, pay the submitter via BOLT11 invoice (default) or Lightning address (fallback)
   if (l402Enabled) {
+    if (!(await checkDailyGlobalRate())) {
+      return res.status(429).json({
+        error: `Daily submission limit reached (${API_SUB_RATE_DAILY_MAX} paid submissions per UTC calendar day). Try again after 00:00 UTC.`,
+      });
+    }
+
     const hasInvoice = invoice && invoice.trim();
     const hasLightningAddress = lightningAddress && lightningAddress.includes("@");
 
