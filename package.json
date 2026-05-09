@@ -5,7 +5,8 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "db:apply-rate-events": "node scripts/run-mgmt-sql.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
