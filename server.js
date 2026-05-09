@@ -88,26 +88,96 @@ function recordIpSubmission(ip) {
   ipSubmissionLog.set(ip, timestamps);
 }
 
+/** Collapse subdomains for abuse limits (a.foo.com → foo.com). Not eTLD+1-perfect for all ccTLDs. */
+function rateLimitParentDomain(hostname) {
+  const host = (hostname || "").toLowerCase().replace(/^www\./, "");
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length <= 2) return host;
+  return parts.slice(-2).join(".");
+}
+
 async function checkDomainRate(domain) {
   if (!supabase) return true;
+  const parent = rateLimitParentDomain(domain);
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const pattern = `%${domain}%`;
-  const { count } = await supabase
+  const { data, error } = await supabase
     .from("api_submissions")
-    .select("id", { count: "exact", head: true })
-    .ilike("endpoint", pattern)
-    .gte("submitted_at", since);
-  return (count || 0) < API_SUB_RATE_DOMAIN_MAX;
+    .select("endpoint")
+    .gte("submitted_at", since)
+    .limit(2000);
+  if (error || !data) {
+    console.warn("checkDomainRate: query failed — blocking submission:", error?.message || "no data");
+    return false;
+  }
+  if (data.length >= 2000) {
+    console.warn("checkDomainRate: row cap hit — blocking submission");
+    return false;
+  }
+  const parentHits = data.filter((row) => {
+    try {
+      const h = new URL(row.endpoint).hostname.toLowerCase().replace(/^www\./, "");
+      return rateLimitParentDomain(h) === parent;
+    } catch (_) {
+      return false;
+    }
+  }).length;
+  return parentHits < API_SUB_RATE_DOMAIN_MAX;
 }
 
 async function checkDailyGlobalRate() {
   if (!supabase) return true;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("api_submissions")
     .select("id", { count: "exact", head: true })
     .gte("submitted_at", since);
+  if (error) {
+    console.warn("checkDailyGlobalRate: query failed — blocking submission:", error.message);
+    return false;
+  }
   return (count || 0) < API_SUB_RATE_DAILY_MAX;
+}
+
+/** Best-effort prune of old IP rate rows (keeps table small). */
+function maybePruneApiSubmissionRateEvents() {
+  if (!supabase || Math.random() > 0.05) return;
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  supabase.from("api_submission_rate_events").delete().lt("created_at", weekAgo).then(() => {});
+}
+
+/**
+ * Reserve one IP slot for an API submission attempt.
+ * Uses Supabase when available (works across Vercel instances); otherwise in-memory map.
+ */
+async function reserveApiSubmissionIpSlot(clientIp) {
+  if (!supabase) {
+    return checkIpRate(clientIp);
+  }
+  const cutoff = new Date(Date.now() - API_SUB_RATE_IP_WINDOW_MS).toISOString();
+  const { count, error: countErr } = await supabase
+    .from("api_submission_rate_events")
+    .select("id", { count: "exact", head: true })
+    .eq("client_ip", clientIp)
+    .gte("created_at", cutoff);
+  if (countErr) {
+    console.warn("reserveApiSubmissionIpSlot: count failed — blocking:", countErr.message);
+    return false;
+  }
+  if ((count || 0) >= API_SUB_RATE_IP_MAX) {
+    return false;
+  }
+  const { error: insErr } = await supabase
+    .from("api_submission_rate_events")
+    .insert({ client_ip: clientIp });
+  if (insErr) {
+    console.warn(
+      "reserveApiSubmissionIpSlot: insert failed — blocking (run latest supabase-migration.sql if table is missing):",
+      insErr.message
+    );
+    return false;
+  }
+  maybePruneApiSubmissionRateEvents();
+  return true;
 }
 
 const SITE_HOST = process.env.SITE_HOST || "https://www.l402apps.com";
@@ -118,7 +188,7 @@ if (l402Enabled && process.env.LND_TLS_VERIFY !== "true") {
 }
 
 if (l402Enabled) {
-  console.log("L402 enabled — app submissions charge 100 sats, API submissions pay 10 sats");
+  console.log(`L402 enabled — app submissions charge ${APP_SUBMISSION_PRICE_SATS} sats, API submissions pay ${API_SUBMISSION_REWARD_SATS} sats`);
 } else {
   console.log("L402 disabled — missing LND_REST_HOST, LND_MACAROON_HEX, or MACAROON_SECRET");
 }
@@ -1845,9 +1915,16 @@ app.post("/api/api-submissions", async (req, res) => {
     return res.status(400).json({ error: "A valid API endpoint URL is required." });
   }
 
-  // Rate limiting
+  if (l402Enabled && !supabase) {
+    return res.status(503).json({
+      error:
+        "Paid API submissions are disabled: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY so limits can be enforced.",
+    });
+  }
+
   const clientIp = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip;
-  if (!checkIpRate(clientIp)) {
+  const ipOk = await reserveApiSubmissionIpSlot(clientIp);
+  if (!ipOk) {
     return res.status(429).json({
       error: `Too many submissions. Please wait before submitting again (max ${API_SUB_RATE_IP_MAX} per ${API_SUB_RATE_IP_WINDOW_MS / 60000} minutes).`,
     });
@@ -1991,7 +2068,9 @@ app.post("/api/api-submissions", async (req, res) => {
   };
 
   await writeApiSubmission(entry);
-  recordIpSubmission(clientIp);
+  if (!supabase) {
+    recordIpSubmission(clientIp);
+  }
 
   try {
     await sendApiSubmissionEmail(entry);
