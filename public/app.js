@@ -917,7 +917,7 @@ apiConfirmForm.addEventListener("submit", async function (event) {
 });
 
 /* -- L402 Status (for paywall note) -- */
-var apiRewardSats = 100;
+var apiRewardSats = 10;
 
 var checkL402Status = async function () {
   try {
